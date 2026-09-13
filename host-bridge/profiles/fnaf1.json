@@ -1,0 +1,9 @@
+{
+  "id": "fnaf1",
+  "display_name": "Five Nights at Freddy's 1",
+  "title_contains": [
+    "Five Nights at Freddy's",
+    "FNAF"
+  ],
+  "process_names": []
+}

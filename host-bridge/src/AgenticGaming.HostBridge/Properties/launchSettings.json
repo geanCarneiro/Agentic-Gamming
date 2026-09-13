@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "AgenticGaming.HostBridge": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "AGENTIC_CORE_WS": "ws://localhost:8000/ws/host-bridge",
+        "HOST_BRIDGE_TOKEN": "dev-only-change-me",
+        "BRIDGE_DRY_RUN": "true",
+        "BRIDGE_SAFE_CAPTURE": "false",
+        "BRIDGE_CAPTURE_INTERVAL_MS": "500",
+        "BRIDGE_MAX_CAPTURE_WIDTH": "1280",
+        "BRIDGE_MAX_CAPTURE_HEIGHT": "720"
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "fnaf1",
+  "version": "0.1.0",
+  "display_name": "Five Nights at Freddy's 1",
+  "description": "Initial external Game Pack for the first live benchmark.",
+  "default_action": "observe_camera",
+  "ontology": {
+    "scenes": ["office", "camera_panel", "camera_view", "unknown"],
+    "entities": ["door", "light", "camera", "animatronic", "power"],
+    "audio_events": ["unknown", "footstep", "door_movement", "ambient"]
+  },
+  "vision": {
+    "pipeline": [],
+    "status": "contract_only",
+    "notes": "Detectors and calibration are intentionally external and not implemented yet."
+  },
+  "audio": {
+    "pipeline": [],
+    "status": "contract_only",
+    "notes": "Relative loudness fields are supported by the core; classifiers are not included yet."
+  },
+  "knowledge": [
+    "knowledge/mechanics.json"
+  ],
+  "actions_file": "actions.json"
+}

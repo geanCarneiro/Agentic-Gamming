@@ -1,0 +1,42 @@
+services:
+  nats:
+    image: nats:2.11-alpine
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/varz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      EVENT_BUS_BACKEND: ${EVENT_BUS_BACKEND:-memory}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      GAME_PACKS_DIR: /app/game-packs
+      DEFAULT_GAME_PACK: ${DEFAULT_GAME_PACK:-fnaf1}
+      INFERENCE_DEVICE: ${INFERENCE_DEVICE:-auto}
+      DRY_RUN: ${DRY_RUN:-true}
+      LOG_PATH: /app/data/logs/core.jsonl
+      HOST_BRIDGE_TOKEN: ${HOST_BRIDGE_TOKEN:-dev-only-change-me}
+      BRIDGE_ARTIFACTS_DIR: /app/data/bridge
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./game-packs:/app/game-packs:ro
+      - ./web:/app/web:ro
+      - ./data:/app/data
+    depends_on:
+      nats:
+        condition: service_healthy
+    command: ["uvicorn", "agentic_gaming.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+volumes:
+  nats-data:

@@ -1,0 +1,48 @@
+{
+  "actions": [
+    {
+      "id": "observe_camera",
+      "intent": "observe_camera",
+      "description": "Open the camera panel as an Alpha placeholder action.",
+      "motor_program": "OPEN_CAMERA_PANEL",
+      "risk": "normal"
+    },
+    {
+      "id": "close_camera_panel",
+      "intent": "close_camera_panel",
+      "description": "Close the camera panel.",
+      "motor_program": "CLOSE_CAMERA_PANEL",
+      "risk": "normal"
+    }
+  ],
+  "motor_programs": [
+    {
+      "id": "OPEN_CAMERA_PANEL",
+      "version": "0.1.0",
+      "description": "Placeholder motor program for the camera panel.",
+      "steps": [
+        {"type": "mouse_button_down", "value": "left", "duration_ms": 0},
+        {"type": "wait", "value": null, "duration_ms": 120},
+        {"type": "mouse_button_up", "value": "left", "duration_ms": 0}
+      ],
+      "preconditions": {"scene": "office"},
+      "cancellable_after_step": 0,
+      "timeout_ms": 500,
+      "failure_action": "CLOSE_CAMERA_PANEL"
+    },
+    {
+      "id": "CLOSE_CAMERA_PANEL",
+      "version": "0.1.0",
+      "description": "Placeholder motor program for closing the camera panel.",
+      "steps": [
+        {"type": "mouse_button_down", "value": "left", "duration_ms": 0},
+        {"type": "wait", "value": null, "duration_ms": 120},
+        {"type": "mouse_button_up", "value": "left", "duration_ms": 0}
+      ],
+      "preconditions": {"scene": "camera_panel"},
+      "cancellable_after_step": 0,
+      "timeout_ms": 500,
+      "failure_action": null
+    }
+  ]
+}
