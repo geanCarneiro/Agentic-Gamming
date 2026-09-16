@@ -66,8 +66,9 @@ O core não deve conhecer APIs específicas de captura do Windows. Ele recebe ev
 - aplicação console/worker para o processo principal;
 - `ClientWebSocket` para comunicação local com o core;
 - APIs Win32 para enumeração e validação de janelas;
-- captura inicial por GDI/`Graphics.CopyFromScreen`;
-- evolução prevista para `Windows.Graphics.Capture`;
+- captura preferencial por `Windows.Graphics.Capture`, com suporte a janela por HWND e monitor por HMONITOR;
+- fallback GDI/`Graphics.CopyFromScreen` apenas para diagnóstico de desktop e `PrintWindow` para compatibilidade de janelas;
+- dependências de WinRT/Windows SDK restauráveis pelo projeto, sem exigir o Windows SDK instalado globalmente;
 - captura de áudio prevista com NAudio e loopback do Windows;
 - entrada prevista com `SendInput`;
 - WinForms usado no overlay textual inicial, com possibilidade de WPF em uma UI futura;
@@ -147,7 +148,11 @@ Variáveis relevantes:
 - `BRIDGE_LOG_PATH`;
 - `BRIDGE_PREVIEW_PATH`.
 
-O modo `--screen` existe apenas para diagnóstico, captura a área de trabalho inteira e ativa automaticamente `safe-capture`. O modo normal exige seleção explícita de janela e mantém o overlay visível; `--safe-capture` pode ser usado se a captura específica ainda incorporar o overlay.
+O modo `--screen` existe apenas para diagnóstico, captura o monitor primário
+por `Windows.Graphics.Capture` e ativa automaticamente `safe-capture`. O modo
+normal exige seleção explícita de janela e mantém o overlay visível;
+`--safe-capture` pode ser usado se a captura específica ainda incorporar o
+overlay. Suporte a composição de múltiplos monitores permanece evolução futura.
 
 O dashboard do Core fica em `http://localhost:8000`. Durante o Beta 2, a seção
 `Visão ao vivo do agente` consulta `/api/bridge/status`, `/api/bridge/events` e

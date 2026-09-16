@@ -36,6 +36,23 @@ public sealed class WindowCatalog
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr lParam);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDesktopWindows(
+        IntPtr desktopHandle,
+        EnumWindowsCallback callback,
+        IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr OpenInputDesktop(
+        uint flags,
+        [MarshalAs(UnmanagedType.Bool)] bool inherit,
+        uint desiredAccess);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseDesktop(IntPtr desktopHandle);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowText(IntPtr windowHandle, StringBuilder text, int maxCount);
 
@@ -61,23 +78,30 @@ public sealed class WindowCatalog
     public IReadOnlyList<WindowInfo> GetVisibleWindows()
     {
         var windows = new List<WindowInfo>();
-        EnumWindows((windowHandle, _) =>
+        var knownHandles = new HashSet<IntPtr>();
+
+        void CollectWindow(IntPtr windowHandle)
         {
+            if (!knownHandles.Add(windowHandle))
+            {
+                return;
+            }
+
             if (!IsWindowVisible(windowHandle) || IsIconic(windowHandle))
             {
-                return true;
+                return;
             }
 
             var title = GetTitle(windowHandle);
             if (string.IsNullOrWhiteSpace(title) || !GetWindowRect(windowHandle, out var nativeBounds))
             {
-                return true;
+                return;
             }
 
             var bounds = ToBounds(nativeBounds);
             if (bounds.Width <= 0 || bounds.Height <= 0)
             {
-                return true;
+                return;
             }
 
             GetWindowThreadProcessId(windowHandle, out var processId);
@@ -87,8 +111,30 @@ public sealed class WindowCatalog
                 GetProcessName((int)processId),
                 title,
                 bounds));
+        }
+
+        EnumWindows((windowHandle, _) =>
+        {
+            CollectWindow(windowHandle);
             return true;
         }, IntPtr.Zero);
+
+        var inputDesktop = OpenInputDesktop(0, false, DesktopReadObjects | DesktopEnumerate);
+        if (inputDesktop != IntPtr.Zero)
+        {
+            try
+            {
+                EnumDesktopWindows(inputDesktop, (windowHandle, _) =>
+                {
+                    CollectWindow(windowHandle);
+                    return true;
+                }, IntPtr.Zero);
+            }
+            finally
+            {
+                CloseDesktop(inputDesktop);
+            }
+        }
 
         return windows
             .OrderBy(window => window.Title, StringComparer.OrdinalIgnoreCase)
@@ -98,22 +144,42 @@ public sealed class WindowCatalog
     public bool TryGetCaptureRegion(WindowSelection selection, out CaptureRegion? region)
     {
         var handle = new IntPtr(selection.WindowHandle);
-        if (!IsWindow(handle) || !IsWindowVisible(handle) || IsIconic(handle) ||
-            !GetWindowRect(handle, out var nativeBounds))
+        // A seleção pode ter sido descoberta no desktop interativo enquanto o
+        // Bridge está executando em outro desktop auxiliar. Nessa situação,
+        // IsWindowVisible/IsIconic pode retornar um estado incompleto apesar de
+        // o HWND continuar válido. A existência do HWND, seu PID e um retângulo
+        // válido são as verificações que permanecem confiáveis entre desktops.
+        if (IsWindow(handle) && GetWindowRect(handle, out var nativeBounds))
         {
-            region = null;
-            return false;
+            GetWindowThreadProcessId(handle, out var processId);
+            if (processId != selection.ProcessId)
+            {
+                region = null;
+                return false;
+            }
+
+            var bounds = ToBounds(nativeBounds);
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+            {
+                region = null;
+                return false;
+            }
+
+            region = new CaptureRegion(
+                handle,
+                selection.ProcessId,
+                GetProcessName(selection.ProcessId),
+                GetTitle(handle),
+                bounds);
+            return true;
         }
 
-        GetWindowThreadProcessId(handle, out var processId);
-        if (processId != selection.ProcessId)
-        {
-            region = null;
-            return false;
-        }
-
-        var bounds = ToBounds(nativeBounds);
-        if (bounds.Width <= 0 || bounds.Height <= 0)
+        // The selector can enumerate the user's input desktop while the
+        // Bridge itself remains attached to an isolated desktop. In that
+        // case user32 refuses to validate the HWND from this thread even
+        // though the selected process and its saved bounds are still valid.
+        if (!IsProcessAlive(selection.ProcessId) || selection.Bounds.Width <= 0 ||
+            selection.Bounds.Height <= 0)
         {
             region = null;
             return false;
@@ -122,22 +188,31 @@ public sealed class WindowCatalog
         region = new CaptureRegion(
             handle,
             selection.ProcessId,
-            GetProcessName(selection.ProcessId),
-            GetTitle(handle),
-            bounds);
+            selection.ProcessName,
+            selection.Title,
+            selection.Bounds);
         return true;
     }
 
     public static CaptureRegion GetVirtualScreenRegion()
     {
-        var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
+        var screen = System.Windows.Forms.Screen.PrimaryScreen
+            ?? throw new InvalidOperationException("Nenhum monitor primário foi encontrado.");
+        var bounds = screen.Bounds;
         return new CaptureRegion(
-            IntPtr.Zero,
+            MonitorFromPoint(new NativePoint(bounds.Left, bounds.Top), MonitorDefaultToNearest),
             0,
-            "desktop",
-            "Virtual Screen",
+            "monitor",
+            "Primary Monitor",
             new WindowBounds(bounds.Left, bounds.Top, bounds.Width, bounds.Height));
     }
+
+    private const uint MonitorDefaultToNearest = 0x00000002;
+    private const uint DesktopReadObjects = 0x0001;
+    private const uint DesktopEnumerate = 0x0040;
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(NativePoint point, uint flags);
 
     private static string GetTitle(IntPtr windowHandle)
     {
@@ -163,6 +238,19 @@ public sealed class WindowCatalog
         }
     }
 
+    private static bool IsProcessAlive(int processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     private static WindowBounds ToBounds(NativeRect rectangle)
     {
         return new WindowBounds(
@@ -174,4 +262,7 @@ public sealed class WindowCatalog
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct NativeRect(int Left, int Top, int Right, int Bottom);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct NativePoint(int X, int Y);
 }

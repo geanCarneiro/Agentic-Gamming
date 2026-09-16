@@ -16,6 +16,8 @@ public sealed class DesktopScreenCapture
     private readonly int _maxHeight;
     private readonly Func<CaptureRegion?> _regionProvider;
     private readonly JsonLineLogger _logger;
+    private readonly WindowsGraphicsCapture _graphicsCapture = new();
+    private IntPtr _graphicsCaptureDisabledTarget;
 
     public DesktopScreenCapture(
         string previewPath,
@@ -47,9 +49,7 @@ public sealed class DesktopScreenCapture
             region.Bounds.Top,
             region.Bounds.Width,
             region.Bounds.Height);
-        using var source = region.WindowHandle == IntPtr.Zero
-            ? CaptureDesktop(bounds)
-            : CaptureWindow(region.WindowHandle, bounds);
+        using var source = await CaptureSourceAsync(region, bounds, cancellationToken);
 
         var scale = Math.Min(1d, Math.Min((double)_maxWidth / source.Width, (double)_maxHeight / source.Height));
         var outputWidth = Math.Max(1, (int)Math.Round(source.Width * scale));
@@ -91,6 +91,59 @@ public sealed class DesktopScreenCapture
         }, cancellationToken);
 
         return frame;
+    }
+
+    private async Task<Bitmap> CaptureSourceAsync(
+        CaptureRegion region,
+        Rectangle bounds,
+        CancellationToken cancellationToken)
+    {
+        if (region.WindowHandle != IntPtr.Zero)
+        {
+            if (_graphicsCaptureDisabledTarget != region.WindowHandle)
+            {
+                try
+                {
+                    var source = region.ProcessId == 0
+                        ? await _graphicsCapture.CaptureMonitorAsync(
+                            region.WindowHandle,
+                            bounds.Width,
+                            bounds.Height,
+                            cancellationToken)
+                        : await _graphicsCapture.CaptureWindowAsync(
+                            region.WindowHandle,
+                            bounds.Width,
+                            bounds.Height,
+                            cancellationToken);
+                    await _logger.WriteAsync("capture.graphics_capture", new
+                    {
+                        target = region.ProcessId == 0 ? "monitor" : "window",
+                        window_title = region.Title,
+                        process_id = region.ProcessId,
+                    }, cancellationToken);
+                    return source;
+                }
+                catch (Exception exception) when (exception is PlatformNotSupportedException or COMException or InvalidOperationException)
+                {
+                    _graphicsCaptureDisabledTarget = region.WindowHandle;
+                    await _logger.WriteAsync("capture.graphics_capture_failed", new
+                    {
+                        target = region.ProcessId == 0 ? "monitor" : "window",
+                        window_title = region.Title,
+                        process_id = region.ProcessId,
+                        exception = exception.GetType().FullName,
+                        message = exception.Message,
+                        fallback = region.ProcessId == 0 ? "gdi_desktop" : "print_window",
+                    }, cancellationToken);
+                }
+            }
+
+            return region.ProcessId == 0
+                ? CaptureDesktop(bounds)
+                : CaptureWindow(region.WindowHandle, bounds);
+        }
+
+        return CaptureDesktop(bounds);
     }
 
     private static Bitmap CaptureDesktop(Rectangle bounds)

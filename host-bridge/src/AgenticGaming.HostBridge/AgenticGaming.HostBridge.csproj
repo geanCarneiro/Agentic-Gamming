@@ -1,11 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>AgenticGaming.HostBridge</AssemblyName>
     <RootNamespace>AgenticGaming.HostBridge</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageDownload Include="Microsoft.Windows.SDK.NET.Ref" Version="[10.0.26100.43]" />
+    <PackageReference Include="Lvhang.WindowsCapture" Version="1.1.0" />
+    <Reference Include="Microsoft.Windows.SDK.NET">
+      <HintPath>$(NuGetPackageRoot)microsoft.windows.sdk.net.ref\10.0.26100.43\lib\net6.0\Microsoft.Windows.SDK.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="WinRT.Runtime">
+      <HintPath>$(NuGetPackageRoot)microsoft.windows.sdk.net.ref\10.0.26100.43\lib\net6.0\WinRT.Runtime.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>
