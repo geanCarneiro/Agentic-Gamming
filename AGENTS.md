@@ -309,6 +309,15 @@ Resultado esperado:
 - comportamento coerente em uma sessão real;
 - documentação de instalação, execução e recuperação.
 
+## Publicação Git
+
+Quando o usuário autorizar um commit ou solicitar a conclusão de uma
+entrega, o `git push` da branch atual é presumido como parte da tarefa,
+salvo quando o usuário especificar explicitamente que a alteração deve
+permanecer apenas local ou que o push não deve ser realizado. Antes de
+publicar, confirmar a branch atual, o remoto, o SHA local e o SHA remoto,
+preservando alterações locais não relacionadas.
+
 ## Princípios de implementação
 
 - manter captura, transporte, percepção, decisão e execução em módulos distintos;
