@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .agent import DeterministicGateway
+from .audio_analysis import AudioAnalysisConfig, AudioAnalyzer
 from .contracts import (
     AgentDecision,
     AudioChunk,
@@ -143,8 +144,31 @@ def create_app() -> FastAPI:
             "last_audio_age_ms": None,
             "_last_audio_started_at_ns": None,
             "_audio_last_sequence": None,
+            "audio_analysis_status": "DISABLED",
+            "audio_analysis_config": {},
+            "audio_baseline_ready": False,
+            "audio_baseline_dbfs": None,
+            "audio_last_rms": None,
+            "audio_last_peak": None,
+            "audio_last_dbfs": None,
+            "audio_last_relative_loudness_db": None,
+            "audio_last_loudness_percentile": None,
+            "audio_buffer_chunks": 0,
+            "audio_buffer_duration_ms": 0.0,
+            "audio_last_candidate_id": None,
+            "audio_candidates_detected": 0,
+            "audio_last_latency_ms": None,
+            "audio_latency_p50_ms": None,
+            "audio_latency_p95_ms": None,
+            "audio_latency_p99_ms": None,
+            "audio_latency_max_ms": None,
+            "audio_latency_deadline_ms": None,
+            "audio_latency_deadline_met": None,
+            "audio_latency_deadline_misses": 0,
+            "audio_last_trace_id": None,
         }
         app.state.bridge_events = []
+        app.state.audio_analyzer = None
         logger.info("core_started", extra={"event_type": "core.started"})
 
     @app.on_event("shutdown")
@@ -237,6 +261,19 @@ def create_app() -> FastAPI:
             )
         return json.loads(metadata_path.read_text(encoding="utf-8"))
 
+    @app.get("/api/bridge/latest-audio-analysis", include_in_schema=False)
+    async def latest_bridge_audio_analysis():
+        analysis_path = (
+            Path(os.getenv("BRIDGE_ARTIFACTS_DIR", "data/bridge"))
+            / "latest-audio-analysis.json"
+        )
+        if not analysis_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="No analyzed bridge audio chunk has been received",
+            )
+        return json.loads(analysis_path.read_text(encoding="utf-8"))
+
     @app.websocket("/ws/host-bridge")
     async def host_bridge(websocket: WebSocket):
         expected_token = os.getenv("HOST_BRIDGE_TOKEN", "dev-only-change-me")
@@ -263,6 +300,7 @@ def create_app() -> FastAPI:
                 message = await websocket.receive_json()
                 message_type = message.get("type")
                 if message_type == "hello":
+                    app.state.audio_analyzer = None
                     update_bridge_status(
                         client_id=message.get("client_id"),
                         protocol_version=message.get("protocol_version"),
@@ -276,6 +314,15 @@ def create_app() -> FastAPI:
                     )
                     audio = message.get("audio")
                     if isinstance(audio, dict):
+                        pack_audio = {}
+                        profile_id = message.get("profile_id")
+                        if isinstance(profile_id, str):
+                            try:
+                                pack_audio = app.state.registry.get(profile_id).manifest.audio
+                            except KeyError:
+                                pack_audio = {}
+                        analyzer = AudioAnalyzer(AudioAnalysisConfig.from_sources(pack_audio))
+                        app.state.audio_analyzer = analyzer
                         update_bridge_status(
                             audio_status="READY",
                             audio_stream_id=audio.get("stream_id"),
@@ -289,6 +336,28 @@ def create_app() -> FastAPI:
                             audio_sample_format=audio.get("sample_format"),
                             audio_chunk_duration_ms=audio.get("chunk_duration_ms"),
                             _audio_last_sequence=None,
+                            audio_analysis_status="WARMING",
+                            audio_analysis_config=analyzer.config.model_dump(),
+                            audio_baseline_ready=False,
+                            audio_baseline_dbfs=None,
+                            audio_last_rms=None,
+                            audio_last_peak=None,
+                            audio_last_dbfs=None,
+                            audio_last_relative_loudness_db=None,
+                            audio_last_loudness_percentile=None,
+                            audio_buffer_chunks=0,
+                            audio_buffer_duration_ms=0.0,
+                            audio_last_candidate_id=None,
+                            audio_candidates_detected=0,
+                            audio_last_latency_ms=None,
+                            audio_latency_p50_ms=None,
+                            audio_latency_p95_ms=None,
+                            audio_latency_p99_ms=None,
+                            audio_latency_max_ms=None,
+                            audio_latency_deadline_ms=analyzer.config.decision_budget_ms,
+                            audio_latency_deadline_met=None,
+                            audio_latency_deadline_misses=0,
+                            audio_last_trace_id=None,
                         )
                     record_bridge_event("bridge.hello", {
                         "client_id": message.get("client_id"),
@@ -499,8 +568,36 @@ def create_app() -> FastAPI:
                             "dropped_chunks": gap,
                         })
 
+                    received_at_ns = time_ns()
+                    analyzer = app.state.audio_analyzer
+                    if analyzer is None:
+                        analyzer = AudioAnalyzer()
+                        app.state.audio_analyzer = analyzer
+                    try:
+                        analysis = analyzer.analyze(
+                            chunk,
+                            audio_bytes,
+                            received_at_ns=received_at_ns,
+                        )
+                    except ValueError as exc:
+                        code = "AUDIO_ANALYSIS_FAILED"
+                        update_bridge_status(last_message_type=message_type, last_error=code)
+                        record_bridge_event("bridge.error", {
+                            "code": code,
+                            "message": str(exc),
+                            "chunk_id": chunk.chunk_id,
+                        })
+                        await websocket.send_json({
+                            "type": "error",
+                            "code": code,
+                            "message": "audio chunk could not be analyzed",
+                        })
+                        continue
+
+                    analysis_snapshot = analyzer.snapshot()
                     audio_path = bridge_dir / "latest-audio.pcm"
                     metadata_path = bridge_dir / "latest-audio.json"
+                    analysis_path = bridge_dir / "latest-audio-analysis.json"
                     audio_path.write_bytes(audio_bytes)
                     metadata_path.write_text(json.dumps({
                         "stream_id": chunk.stream_id,
@@ -519,8 +616,20 @@ def create_app() -> FastAPI:
                         "source_process_name": chunk.source_process_name,
                         "capture_packets_dropped": chunk.capture_packets_dropped,
                     }, ensure_ascii=False) + "\n", encoding="utf-8")
+                    analysis_payload = {
+                        "measurement": analysis.measurement.model_dump(),
+                        "candidate": (
+                            analysis.candidate.model_dump()
+                            if analysis.candidate is not None
+                            else None
+                        ),
+                        "latency": analysis.latency.model_dump(),
+                    }
+                    analysis_path.write_text(
+                        json.dumps(analysis_payload, ensure_ascii=False) + "\n",
+                        encoding="utf-8",
+                    )
 
-                    received_at_ns = time_ns()
                     audio_age_ms = round(
                         max(0, received_at_ns - chunk.started_at_ns) / 1_000_000,
                         1,
@@ -554,6 +663,32 @@ def create_app() -> FastAPI:
                         last_audio_age_ms=audio_age_ms,
                         _last_audio_started_at_ns=chunk.started_at_ns,
                         _audio_last_sequence=chunk.sequence,
+                        audio_analysis_status=analysis_snapshot["status"],
+                        audio_baseline_ready=analysis.measurement.baseline_ready,
+                        audio_baseline_dbfs=analysis.measurement.baseline_dbfs,
+                        audio_last_rms=analysis.measurement.rms,
+                        audio_last_peak=analysis.measurement.peak,
+                        audio_last_dbfs=analysis.measurement.dbfs,
+                        audio_last_relative_loudness_db=analysis.measurement.relative_loudness_db,
+                        audio_last_loudness_percentile=analysis.measurement.loudness_percentile,
+                        audio_buffer_chunks=analysis_snapshot["buffer_chunks"],
+                        audio_buffer_duration_ms=analysis_snapshot["buffer_duration_ms"],
+                        audio_last_candidate_id=(
+                            analysis.candidate.candidate_id if analysis.candidate else None
+                        ),
+                        audio_candidates_detected=(
+                            app.state.bridge["audio_candidates_detected"]
+                            + (1 if analysis.candidate else 0)
+                        ),
+                        audio_last_latency_ms=analysis.latency.observation_to_decision_ms,
+                        audio_latency_p50_ms=analysis_snapshot["latency_p50_ms"],
+                        audio_latency_p95_ms=analysis_snapshot["latency_p95_ms"],
+                        audio_latency_p99_ms=analysis_snapshot["latency_p99_ms"],
+                        audio_latency_max_ms=analysis_snapshot["latency_max_ms"],
+                        audio_latency_deadline_ms=analysis.latency.decision_budget_ms,
+                        audio_latency_deadline_met=analysis.latency.deadline_met,
+                        audio_latency_deadline_misses=analysis_snapshot["latency_deadline_misses"],
+                        audio_last_trace_id=analysis.latency.trace_id,
                         last_message_type=message_type,
                         last_error=None,
                     )
@@ -567,6 +702,7 @@ def create_app() -> FastAPI:
                         "sample_format": chunk.sample_format,
                         "source_process_id": chunk.source_process_id,
                         "capture_packets_dropped": chunk.capture_packets_dropped,
+                        "analysis": analysis_payload,
                     })
                     await websocket.send_json({
                         "type": "audio_ack",

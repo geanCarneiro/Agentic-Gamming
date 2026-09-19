@@ -48,7 +48,7 @@ Por padrão, o overlay não é ocultado quando a captura está vinculada a uma j
 
 O modo `dry-run` é padrão. A captura por janela, o overlay e a execução real de programas motores serão incrementados sobre os mesmos contratos.
 
-## Beta 3 — primeira fatia de áudio
+## Beta 3.1 — primeira fatia de áudio
 
 O primeiro corte do Beta 3 implementa somente a entrada operacional de áudio:
 
@@ -64,8 +64,32 @@ O primeiro corte do Beta 3 implementa somente a entrada operacional de áudio:
 - metadados do último chunk em `latest-audio.json`;
 - telemetria em `/api/bridge/status` e `/api/bridge/events`.
 
-Esta fatia ainda não interpreta o PCM. Não há baseline, loudness, classificação,
-VLM, `AudioEvent`, decisão, replay integral ou input físico.
+Esta fatia não interpreta semanticamente o PCM. A Beta 3.2 adiciona apenas a
+medição determinística descrita abaixo; classificação, VLM, `AudioEvent`,
+decisão, replay integral e input físico continuam fora do escopo.
+
+## Beta 3.2 — análise acústica e latência
+
+O Core mantém um buffer circular curto do áudio estéreo e calcula, por chunk:
+
+- RMS, pico e dBFS geral;
+- RMS e pico por canal;
+- baseline relativo ao histórico recente;
+- loudness relativo e percentil;
+- candidato acústico anônimo quando há energia acima do baseline.
+
+O candidato não identifica a fonte do som e não é um evento semântico. Ele
+serve como janela operacional para uma futura análise multimodal e pode ser
+consultado em `GET /api/bridge/latest-audio-analysis`.
+
+Cada chunk também recebe um trace de latência com as etapas de decodificação,
+medição, histórico/buffer e geração do candidato. O status do Bridge expõe o
+tempo de observação até a decisão dry-run, p50, p95, p99, máximo, orçamento e
+quantidade de deadlines perdidos.
+
+Os defaults são 5 segundos de buffer, 3 segundos de aquecimento do baseline e
+200 ms de orçamento de decisão. Eles podem ser ajustados por `AUDIO_ANALYSIS_*`
+ou sobrescritos pelo Game Pack em `audio.analysis`.
 
 ### Validação manual do loopback
 

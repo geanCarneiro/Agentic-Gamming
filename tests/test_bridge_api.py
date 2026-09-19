@@ -1,6 +1,7 @@
 import base64
 import shutil
 from pathlib import Path
+from time import time_ns
 
 from fastapi.testclient import TestClient
 
@@ -96,14 +97,14 @@ def test_bridge_accepts_audio_chunk_and_keeps_only_latest_artifact(monkeypatch):
                 assert websocket.receive_json()["type"] == "hello_ack"
 
                 payload = bytes(range(160))
-                import base64
+                started_at_ns = time_ns()
 
                 websocket.send_json({
                     "type": "audio_chunk",
                     "stream_id": "audio-test-stream",
                     "chunk_id": "audio-chunk-1",
                     "sequence": 1,
-                    "started_at_ns": 1_700_000_000_000_000_000,
+                    "started_at_ns": started_at_ns,
                     "duration_ns": 40_000_000,
                     "sample_rate": 1000,
                     "channels": 1,
@@ -128,8 +129,15 @@ def test_bridge_accepts_audio_chunk_and_keeps_only_latest_artifact(monkeypatch):
                 assert status["audio_bytes_received"] == 160
                 assert status["last_audio_sequence"] == 1
                 assert status["audio_source_process_id"] == 4321
+                assert status["audio_analysis_status"] == "WARMING"
+                assert status["audio_buffer_chunks"] == 1
+                assert status["audio_last_latency_ms"] is not None
+                assert status["audio_latency_p95_ms"] is not None
                 assert client.get("/api/bridge/latest-audio").content == payload
                 assert client.get("/api/bridge/latest-audio/metadata").json()["sequence"] == 1
+                analysis = client.get("/api/bridge/latest-audio-analysis").json()
+                assert analysis["measurement"]["sequence"] == 1
+                assert analysis["latency"]["deadline_met"] is True
 
                 websocket.send_json({
                     "type": "audio_chunk",

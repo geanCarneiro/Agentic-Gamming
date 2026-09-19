@@ -92,6 +92,53 @@ class AudioChunk(StrictModel):
     capture_packets_dropped: int = Field(default=0, ge=0)
 
 
+class AudioMeasurement(StrictModel):
+    stream_id: str
+    chunk_id: str
+    sequence: int = Field(ge=1)
+    started_at_ns: int = Field(ge=0)
+    ended_at_ns: int = Field(gt=0)
+    sample_rate: int = Field(gt=0)
+    channels: int = Field(gt=0, le=32)
+    sample_format: str
+    sample_count: int = Field(gt=0)
+    rms: float = Field(ge=0)
+    peak: float = Field(ge=0)
+    channel_rms: list[float] = Field(min_length=1)
+    channel_peak: list[float] = Field(min_length=1)
+    dbfs: float
+    baseline_dbfs: float | None = None
+    relative_loudness_db: float | None = None
+    loudness_percentile: float | None = Field(default=None, ge=0, le=1)
+    baseline_ready: bool
+
+
+class AudioCandidate(StrictModel):
+    candidate_id: str
+    stream_id: str
+    started_at_ns: int = Field(ge=0)
+    ended_at_ns: int = Field(gt=0)
+    first_sequence: int = Field(ge=1)
+    last_sequence: int = Field(ge=1)
+    salience: float = Field(ge=0, le=1)
+    evidence: list[str] = Field(default_factory=list)
+
+
+class LatencyTrace(StrictModel):
+    trace_id: str
+    stream_id: str
+    chunk_id: str
+    sequence: int = Field(ge=1)
+    observed_at_ns: int = Field(ge=0)
+    received_at_ns: int = Field(ge=0)
+    stages_ms: dict[str, float] = Field(default_factory=dict)
+    capture_to_core_ms: float = Field(ge=0)
+    processing_ms: float = Field(ge=0)
+    observation_to_decision_ms: float = Field(ge=0)
+    decision_budget_ms: float = Field(gt=0)
+    deadline_met: bool
+
+
 class AudioEvent(StrictModel):
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     started_at_ns: int = Field(ge=0)

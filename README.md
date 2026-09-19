@@ -47,7 +47,7 @@ O modo padrão é `dry-run`. O último frame recebido pelo core pode ser visuali
 
 O dashboard em `http://localhost:8000` possui a seção Beta 2 `Visão ao vivo do agente`, que mostra a conexão do Bridge, o Game Profile, a janela/PID, o modo de captura, métricas do último frame e eventos recentes. A página também mantém o laboratório Alpha para simulações controladas.
 
-### Beta 3 — captura de áudio
+### Beta 3.1 — captura de áudio
 
 A primeira fatia do Beta 3 captura o áudio do jogo, mas ainda não faz detecção,
 classificação, decisão ou reação. O modo padrão é `process_loopback`, associado
@@ -85,6 +85,25 @@ O status fica disponível em `GET /api/bridge/status`; o último áudio pode ser
 consultado em `GET /api/bridge/latest-audio` e seus metadados em
 `GET /api/bridge/latest-audio/metadata`. Esta fase não grava uma sessão inteira
 e não persiste um replay audiovisual.
+
+### Beta 3.2 — análise acústica e latência
+
+A segunda fatia mantém o PCM original e acrescenta análise determinística no
+Core, sem VLM, classificação semântica ou input físico:
+
+- buffer circular limitado aos últimos 5 segundos por padrão;
+- medição de RMS, pico, dBFS e energia por canal;
+- baseline aquecido após 3 segundos por padrão;
+- loudness relativo e percentil no histórico recente;
+- candidatos acústicos anônimos, sem afirmar a fonte do som;
+- rastreamento de latência por chunk, com p50, p95, p99 e deadlines;
+- orçamento padrão de decisão dry-run de 200 ms;
+- último resultado em `GET /api/bridge/latest-audio-analysis`.
+
+Os defaults podem ser ajustados por variáveis `AUDIO_ANALYSIS_*`. Um Game Pack
+pode sobrescrever esses valores em `audio.analysis` no manifesto. O candidato
+acústico é uma ocorrência operacional para uma futura interpretação multimodal;
+ele ainda não é um `AudioEvent` semântico.
 
 O padrão atual usa o barramento em memória para permitir iniciar o core mesmo sem depender do NATS. Para exercitar o adaptador NATS:
 
