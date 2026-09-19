@@ -47,6 +47,45 @@ O modo padrão é `dry-run`. O último frame recebido pelo core pode ser visuali
 
 O dashboard em `http://localhost:8000` possui a seção Beta 2 `Visão ao vivo do agente`, que mostra a conexão do Bridge, o Game Profile, a janela/PID, o modo de captura, métricas do último frame e eventos recentes. A página também mantém o laboratório Alpha para simulações controladas.
 
+### Beta 3 — captura de áudio
+
+A primeira fatia do Beta 3 captura o áudio do jogo, mas ainda não faz detecção,
+classificação, decisão ou reação. O modo padrão é `process_loopback`, associado
+ao PID da janela selecionada, e o chunk nominal de transporte é fixo em `40 ms`.
+O último chunk recebido fica em `data/bridge/latest-audio.pcm`, com metadados em
+`data/bridge/latest-audio.json`.
+
+Para listar os endpoints de saída ativos do Windows:
+
+```powershell
+& 'C:\Program Files\dotnet\dotnet.exe' run --project .\host-bridge\src\AgenticGaming.HostBridge -- --list-audio-devices
+```
+
+Para iniciar a captura do processo selecionado:
+
+```powershell
+$env:BRIDGE_AUDIO_MODE = 'process_loopback'
+$env:BRIDGE_AUDIO_ENABLED = 'true'
+$env:BRIDGE_DRY_RUN = 'true'
+& 'C:\Program Files\dotnet\dotnet.exe' run --project .\host-bridge\src\AgenticGaming.HostBridge
+```
+
+O FNAF deve estar aberto antes do Bridge para que a janela selecionada forneça
+o PID correto. O Bridge não controla o jogo durante este teste.
+
+Para usar o fallback de captura do mix de um dispositivo específico:
+
+```powershell
+$env:BRIDGE_AUDIO_MODE = 'system_loopback'
+$env:BRIDGE_AUDIO_DEVICE_ID = '<device-id-listado-no-comando-anterior>'
+& 'C:\Program Files\dotnet\dotnet.exe' run --project .\host-bridge\src\AgenticGaming.HostBridge
+```
+
+O status fica disponível em `GET /api/bridge/status`; o último áudio pode ser
+consultado em `GET /api/bridge/latest-audio` e seus metadados em
+`GET /api/bridge/latest-audio/metadata`. Esta fase não grava uma sessão inteira
+e não persiste um replay audiovisual.
+
 O padrão atual usa o barramento em memória para permitir iniciar o core mesmo sem depender do NATS. Para exercitar o adaptador NATS:
 
 ```text

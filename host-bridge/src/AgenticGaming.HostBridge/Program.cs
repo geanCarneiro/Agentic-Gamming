@@ -11,8 +11,21 @@ Console.CancelKeyPress += (_, eventArgs) =>
 };
 
 OverlayHost? overlay = null;
+AudioCapture? audioCapture = null;
 try
 {
+    if (options.ListAudioDevices)
+    {
+        foreach (var device in AudioDeviceCatalog.ListRenderDevices())
+        {
+            Console.WriteLine(
+                $"{device.Id} | {device.FriendlyName} | {device.State} | " +
+                $"{device.SampleRate} Hz | {device.Channels} canais");
+        }
+
+        return;
+    }
+
     var windowCatalog = new WindowCatalog();
     WindowSelection? selection = null;
     Func<CaptureRegion?> regionProvider;
@@ -46,6 +59,14 @@ try
         logger);
     overlay = new OverlayHost(options.DryRun);
     await overlay.StartAsync(cancellation.Token);
+    if (options.AudioEnabled)
+    {
+        audioCapture = new AudioCapture(
+            options,
+            logger,
+            selection?.ProcessId,
+            selection?.ProcessName);
+    }
     var client = new CoreWebSocketClient(options, logger, overlay, selection?.ProfileId);
 
     await logger.WriteAsync("bridge.starting", new
@@ -56,9 +77,15 @@ try
         capture_interval_ms = options.CaptureIntervalMs,
         max_capture_width = options.MaxCaptureWidth,
         max_capture_height = options.MaxCaptureHeight,
+        audio_enabled = options.AudioEnabled,
+        audio_mode = options.AudioMode,
+        audio_device_id = options.AudioDeviceId,
+        audio_chunk_ms = options.AudioChunkMs,
+        audio_buffer_ms = options.AudioBufferMs,
+        run_id = options.RunId,
     });
 
-    await client.RunAsync(capture, cancellation.Token);
+    await client.RunAsync(capture, audioCapture, cancellation.Token);
 }
 catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
 {
@@ -76,6 +103,22 @@ catch (Exception exception)
 }
 finally
 {
+    if (audioCapture is not null)
+    {
+        try
+        {
+            await audioCapture.DisposeAsync();
+        }
+        catch (Exception exception)
+        {
+            await logger.WriteAsync("audio.dispose_failed", new
+            {
+                exception = exception.GetType().FullName,
+                message = exception.Message,
+            });
+        }
+    }
+
     if (overlay is not null)
     {
         try

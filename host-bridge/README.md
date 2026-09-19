@@ -46,12 +46,31 @@ O Bridge usa estas configurações:
 | `BRIDGE_DRY_RUN` | `true` | impede ações físicas por padrão |
 | `BRIDGE_LOG_PATH` | `data/logs/host-bridge.jsonl` | log estruturado do Bridge |
 | `BRIDGE_PREVIEW_PATH` | `data/bridge/preview.png` | último frame capturado |
+| `BRIDGE_AUDIO_ENABLED` | `true` | habilita a captura PCM do Beta 3 |
+| `BRIDGE_AUDIO_MODE` | `process_loopback` | captura pelo PID selecionado ou pelo mix do dispositivo |
+| `BRIDGE_AUDIO_DEVICE_ID` | vazio | endpoint de renderização usado no `system_loopback` |
+| `BRIDGE_AUDIO_CHUNK_MS` | `40` | duração nominal dos chunks PCM |
+| `BRIDGE_AUDIO_BUFFER_MS` | `100` | buffer interno solicitado ao WASAPI |
+| `BRIDGE_AUDIO_LATEST_PATH` | `data/bridge/host-latest-audio.pcm` | último chunk PCM local do Bridge |
+| `BRIDGE_RUN_ID` | vazio | identificação opcional da execução live |
 
 O projeto já inclui um perfil de execução para o Visual Studio. Com o core em execução, selecione `AgenticGaming.HostBridge` como projeto de inicialização e pressione `F5`.
 
 Na inicialização, o Bridge lista os Game Profiles e as janelas visíveis do Windows. Pressione `Enter` para aceitar a primeira opção ou informe o número da janela do jogo. A seleção fica registrada em `data/bridge/selection.json` e a captura passa a acompanhar a janela selecionada. Para executar somente o modo de captura da área de trabalho durante diagnósticos, use `--screen`; esse modo ativa automaticamente a captura segura. Em uma janela selecionada, o overlay permanece visível por padrão. Se ele aparecer no frame, use `--safe-capture` ou `BRIDGE_SAFE_CAPTURE=true`.
 
-Para permitir futuramente a execução física de teclado/mouse, a sessão deverá ser iniciada explicitamente com `--live-input`. Essa opção ainda não executa programas motores nesta primeira fatia; ela apenas registra a intenção no handshake.
+Para listar os dispositivos de saída disponíveis:
+
+```powershell
+& 'C:\Program Files\dotnet\dotnet.exe' run --project .\host-bridge\src\AgenticGaming.HostBridge -- --list-audio-devices
+```
+
+O modo padrão do Beta 3 é `process_loopback`: o FNAF precisa estar aberto para
+que a janela selecionada forneça o PID do jogo. Para testar o mix de um
+endpoint específico, use `BRIDGE_AUDIO_MODE=system_loopback` e informe
+`BRIDGE_AUDIO_DEVICE_ID`.
+
+Esta fatia ainda não detecta eventos, chama VLM/LLM ou executa programas
+motores. O modo `dry-run` permanece padrão.
 
 ## Escopo desta primeira fatia
 
@@ -63,7 +82,13 @@ Para permitir futuramente a execução física de teclado/mouse, a sessão dever
 - overlay nativo click-through com metadados do frame;
 - envio de frames PNG em base64;
 - gravação do último preview;
+- captura de áudio PCM por process loopback ou system loopback;
+- envio de chunks de áudio nominais de 40 ms;
+- gravação somente do último chunk de áudio;
 - logs JSONL locais;
 - modo `dry-run` por padrão.
 
-A seleção da janela e o overlay textual básico agora fazem parte do Beta 2. A captura de áudio, as anotações semânticas e a execução real de programas motores serão adicionadas sobre este protocolo, sem misturar a lógica de decisão do agente ao Bridge.
+A seleção da janela e o overlay textual básico fazem parte do Beta 2. A captura
+de áudio operacional é a primeira fatia do Beta 3. As anotações semânticas, a
+detecção auditiva e a execução real de programas motores continuam fora do
+Bridge e serão adicionadas em etapas posteriores.

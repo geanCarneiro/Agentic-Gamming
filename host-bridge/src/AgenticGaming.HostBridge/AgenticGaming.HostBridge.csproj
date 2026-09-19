@@ -5,17 +5,32 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
+    <CsWinRTEnabled>false</CsWinRTEnabled>
     <AssemblyName>AgenticGaming.HostBridge</AssemblyName>
     <RootNamespace>AgenticGaming.HostBridge</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <PackageDownload Include="Microsoft.Windows.SDK.NET.Ref" Version="[10.0.26100.43]" />
     <PackageReference Include="Lvhang.WindowsCapture" Version="1.1.0" />
-    <Reference Include="Microsoft.Windows.SDK.NET">
+    <PackageReference Include="NAudio.Wasapi" Version="3.0.0" />
+    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.1.1" PrivateAssets="all" />
+    <Reference Include="Microsoft.Windows.SDK.NET" Private="true">
+      <IncludeRuntimeDependency>true</IncludeRuntimeDependency>
       <HintPath>$(NuGetPackageRoot)microsoft.windows.sdk.net.ref\10.0.26100.43\lib\net6.0\Microsoft.Windows.SDK.NET.dll</HintPath>
     </Reference>
-    <Reference Include="WinRT.Runtime">
+    <Reference Include="WinRT.Runtime" Private="true">
       <HintPath>$(NuGetPackageRoot)microsoft.windows.sdk.net.ref\10.0.26100.43\lib\net6.0\WinRT.Runtime.dll</HintPath>
     </Reference>
   </ItemGroup>
+
+  <Target Name="IncludeWindowsSdkProjectionRuntimeDependency"
+          AfterTargets="ResolveAssemblyReferences"
+          BeforeTargets="_ComputeUserRuntimeAssemblies">
+    <ItemGroup>
+      <ReferencePath Update="@(ReferencePath)"
+                     Condition="'%(Filename)%(Extension)' == 'Microsoft.Windows.SDK.NET.dll'">
+        <IncludeRuntimeDependency>true</IncludeRuntimeDependency>
+      </ReferencePath>
+    </ItemGroup>
+  </Target>
 </Project>

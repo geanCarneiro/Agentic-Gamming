@@ -47,3 +47,50 @@ de percepção ou decisão do agente.
 Por padrão, o overlay não é ocultado quando a captura está vinculada a uma janela específica. `--safe-capture` ou `BRIDGE_SAFE_CAPTURE=true` ativa a ocultação defensiva; `--screen` também ativa esse modo automaticamente.
 
 O modo `dry-run` é padrão. A captura por janela, o overlay e a execução real de programas motores serão incrementados sobre os mesmos contratos.
+
+## Beta 3 — primeira fatia de áudio
+
+O primeiro corte do Beta 3 implementa somente a entrada operacional de áudio:
+
+- captura por processo como modo padrão (`process_loopback`), incluindo a árvore
+  de processos do PID da janela selecionada;
+- `system_loopback` como modo explícito alternativo, com seleção de endpoint de
+  renderização por `BRIDGE_AUDIO_DEVICE_ID`;
+- chunks PCM nominais de `40 ms`;
+- protocolo corrente de desenvolvimento identificado como `beta-3`;
+- transporte WebSocket autenticado;
+- validação de formato, tamanho, sequência e base64 no Core;
+- persistência somente do último chunk em `latest-audio.pcm`;
+- metadados do último chunk em `latest-audio.json`;
+- telemetria em `/api/bridge/status` e `/api/bridge/events`.
+
+Esta fatia ainda não interpreta o PCM. Não há baseline, loudness, classificação,
+VLM, `AudioEvent`, decisão, replay integral ou input físico.
+
+### Validação manual do loopback
+
+O teste manual é necessário porque o Docker/Core consegue testar o protocolo com
+PCM sintético, mas não substitui a confirmação de que o Windows e o driver de
+áudio estão entregando dados reais.
+
+1. Inicie o Core com `docker compose up --build`.
+2. Abra o FNAF em uma sessão Windows interativa e deixe-o em uma tela que possa
+   emitir áudio. Não é necessário que o Bridge envie input ao jogo.
+3. Inicie o Bridge normalmente. Ele selecionará a janela e utilizará o PID para
+   ativar o process loopback.
+4. Confirme no log local `data/logs/host-bridge.jsonl` o evento
+   `audio.capture_initialized`, com `mode=process_loopback`, PID, sample rate,
+   canais e `chunk_duration_ms=40`.
+5. Confirme que `audio.chunk_sent` aparece com sequência crescente.
+6. Consulte `GET /api/bridge/status` e verifique `audio_status=RECEIVING`, a
+   contagem de chunks e o PID do processo.
+7. Verifique que `data/bridge/latest-audio.pcm` e
+   `data/bridge/latest-audio.json` foram atualizados.
+8. Para validar o isolamento, reproduza áudio de outra aplicação enquanto o
+   FNAF estiver silencioso. Esse áudio não deve ser a fonte do process loopback.
+9. Repita com `BRIDGE_AUDIO_MODE=system_loopback` e um endpoint explicitamente
+   selecionado para validar o modo alternativo.
+
+Esse teste comprova captura, fragmentação, transporte e armazenamento do último
+chunk. Ele não comprova que o áudio foi entendido pelo agente nem que qualquer
+ação será tomada.

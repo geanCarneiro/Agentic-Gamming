@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 import logging
 import os
 from datetime import UTC, datetime
@@ -12,10 +13,12 @@ from uuid import UUID, uuid4
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
 
 from .agent import DeterministicGateway
 from .contracts import (
     AgentDecision,
+    AudioChunk,
     AudioEvent,
     CreateRunRequest,
     EventEnvelope,
@@ -118,6 +121,28 @@ def create_app() -> FastAPI:
             "last_message_type": None,
             "last_error": None,
             "_last_frame_received_at_ns": None,
+            "run_id": None,
+            "audio_status": "DISCONNECTED",
+            "audio_stream_id": None,
+            "audio_mode": None,
+            "audio_device_id": None,
+            "audio_device_name": None,
+            "audio_source_process_id": None,
+            "audio_source_process_name": None,
+            "audio_sample_rate": None,
+            "audio_channels": None,
+            "audio_sample_format": None,
+            "audio_chunk_duration_ms": None,
+            "audio_chunks_received": 0,
+            "audio_bytes_received": 0,
+            "audio_chunks_dropped": 0,
+            "audio_capture_packets_dropped": 0,
+            "last_audio_chunk_id": None,
+            "last_audio_sequence": None,
+            "last_audio_started_at": None,
+            "last_audio_age_ms": None,
+            "_last_audio_started_at_ns": None,
+            "_audio_last_sequence": None,
         }
         app.state.bridge_events = []
         logger.info("core_started", extra={"event_type": "core.started"})
@@ -164,6 +189,13 @@ def create_app() -> FastAPI:
         received_at_ns = status.pop("_last_frame_received_at_ns", None)
         if received_at_ns is not None:
             status["last_frame_age_ms"] = round(max(0, time_ns() - received_at_ns) / 1_000_000, 1)
+        audio_started_at_ns = status.pop("_last_audio_started_at_ns", None)
+        status.pop("_audio_last_sequence", None)
+        if audio_started_at_ns is not None:
+            status["last_audio_age_ms"] = round(
+                max(0, time_ns() - audio_started_at_ns) / 1_000_000,
+                1,
+            )
         return status
 
     @app.get("/api/bridge/events")
@@ -182,6 +214,28 @@ def create_app() -> FastAPI:
             filename="latest.png",
             content_disposition_type="inline",
         )
+
+    @app.get("/api/bridge/latest-audio", include_in_schema=False)
+    async def latest_bridge_audio():
+        audio_path = Path(os.getenv("BRIDGE_ARTIFACTS_DIR", "data/bridge")) / "latest-audio.pcm"
+        if not audio_path.exists():
+            raise HTTPException(status_code=404, detail="No bridge audio chunk has been received")
+        return FileResponse(
+            audio_path,
+            media_type="application/octet-stream",
+            filename="latest-audio.pcm",
+            content_disposition_type="attachment",
+        )
+
+    @app.get("/api/bridge/latest-audio/metadata", include_in_schema=False)
+    async def latest_bridge_audio_metadata():
+        metadata_path = Path(os.getenv("BRIDGE_ARTIFACTS_DIR", "data/bridge")) / "latest-audio.json"
+        if not metadata_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="No bridge audio metadata has been received",
+            )
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
 
     @app.websocket("/ws/host-bridge")
     async def host_bridge(websocket: WebSocket):
@@ -216,18 +270,37 @@ def create_app() -> FastAPI:
                         capabilities=message.get("capabilities") or [],
                         dry_run=message.get("dry_run"),
                         safe_capture=message.get("safe_capture"),
+                        run_id=message.get("run_id"),
                         last_message_type="hello",
                         last_error=None,
                     )
+                    audio = message.get("audio")
+                    if isinstance(audio, dict):
+                        update_bridge_status(
+                            audio_status="READY",
+                            audio_stream_id=audio.get("stream_id"),
+                            audio_mode=audio.get("mode"),
+                            audio_device_id=audio.get("device_id"),
+                            audio_device_name=audio.get("device_name"),
+                            audio_source_process_id=audio.get("source_process_id"),
+                            audio_source_process_name=audio.get("source_process_name"),
+                            audio_sample_rate=audio.get("sample_rate"),
+                            audio_channels=audio.get("channels"),
+                            audio_sample_format=audio.get("sample_format"),
+                            audio_chunk_duration_ms=audio.get("chunk_duration_ms"),
+                            _audio_last_sequence=None,
+                        )
                     record_bridge_event("bridge.hello", {
                         "client_id": message.get("client_id"),
                         "protocol_version": message.get("protocol_version"),
                         "profile_id": message.get("profile_id"),
                         "safe_capture": message.get("safe_capture"),
+                        "run_id": message.get("run_id"),
+                        "audio": audio,
                     })
                     await websocket.send_json({
                         "type": "hello_ack",
-                        "protocol_version": "1.0",
+                        "protocol_version": "beta-3",
                         "server": "agentic-gaming-core",
                         "accepted": True,
                     })
@@ -324,6 +397,183 @@ def create_app() -> FastAPI:
                     await websocket.send_json({
                         "type": "heartbeat_ack",
                         "received_at_ns": monotonic_ns(),
+                    })
+                elif message_type == "audio_chunk":
+                    try:
+                        chunk = AudioChunk.model_validate(message)
+                    except ValidationError as exc:
+                        code = "AUDIO_CHUNK_INVALID"
+                        update_bridge_status(last_message_type=message_type, last_error=code)
+                        record_bridge_event("bridge.error", {
+                            "code": code,
+                            "details": exc.errors(include_url=False),
+                        })
+                        await websocket.send_json({
+                            "type": "error",
+                            "code": code,
+                            "message": "audio_chunk does not satisfy the Beta 3 contract",
+                        })
+                        continue
+
+                    bytes_per_sample = {
+                        "pcm_f32le": 4,
+                        "pcm_s16le": 2,
+                    }.get(chunk.sample_format)
+                    if bytes_per_sample is None:
+                        code = "AUDIO_SAMPLE_FORMAT_UNSUPPORTED"
+                        update_bridge_status(last_message_type=message_type, last_error=code)
+                        record_bridge_event("bridge.error", {
+                            "code": code,
+                            "sample_format": chunk.sample_format,
+                        })
+                        await websocket.send_json({
+                            "type": "error",
+                            "code": code,
+                            "message": "Unsupported audio sample format",
+                        })
+                        continue
+
+                    try:
+                        audio_bytes = base64.b64decode(chunk.data_base64, validate=True)
+                    except (ValueError, binascii.Error):
+                        code = "AUDIO_DATA_INVALID"
+                        update_bridge_status(last_message_type=message_type, last_error=code)
+                        record_bridge_event("bridge.error", {"code": code})
+                        await websocket.send_json({
+                            "type": "error",
+                            "code": code,
+                            "message": "audio_chunk.data_base64 is not valid base64",
+                        })
+                        continue
+
+                    expected_bytes = chunk.frame_count * chunk.channels * bytes_per_sample
+                    if len(audio_bytes) != expected_bytes:
+                        code = "AUDIO_DATA_LENGTH_INVALID"
+                        update_bridge_status(last_message_type=message_type, last_error=code)
+                        record_bridge_event("bridge.error", {
+                            "code": code,
+                            "expected_bytes": expected_bytes,
+                            "actual_bytes": len(audio_bytes),
+                        })
+                        await websocket.send_json({
+                            "type": "error",
+                            "code": code,
+                            "message": "audio chunk byte length does not match its format",
+                        })
+                        continue
+
+                    previous_sequence = app.state.bridge["_audio_last_sequence"]
+                    if (
+                        app.state.bridge["audio_stream_id"] == chunk.stream_id and
+                        previous_sequence is not None and
+                        chunk.sequence <= previous_sequence
+                    ):
+                        code = "AUDIO_SEQUENCE_INVALID"
+                        update_bridge_status(last_message_type=message_type, last_error=code)
+                        record_bridge_event("bridge.error", {
+                            "code": code,
+                            "stream_id": chunk.stream_id,
+                            "sequence": chunk.sequence,
+                            "previous_sequence": previous_sequence,
+                        })
+                        await websocket.send_json({
+                            "type": "error",
+                            "code": code,
+                            "message": "audio chunk sequence must increase per stream",
+                        })
+                        continue
+
+                    if (
+                        previous_sequence is not None and
+                        app.state.bridge["audio_stream_id"] == chunk.stream_id and
+                        chunk.sequence > previous_sequence + 1
+                    ):
+                        gap = chunk.sequence - previous_sequence - 1
+                        update_bridge_status(
+                            audio_chunks_dropped=app.state.bridge["audio_chunks_dropped"] + gap,
+                        )
+                        record_bridge_event("bridge.audio.gap", {
+                            "stream_id": chunk.stream_id,
+                            "from_sequence": previous_sequence + 1,
+                            "to_sequence": chunk.sequence - 1,
+                            "dropped_chunks": gap,
+                        })
+
+                    audio_path = bridge_dir / "latest-audio.pcm"
+                    metadata_path = bridge_dir / "latest-audio.json"
+                    audio_path.write_bytes(audio_bytes)
+                    metadata_path.write_text(json.dumps({
+                        "stream_id": chunk.stream_id,
+                        "chunk_id": chunk.chunk_id,
+                        "sequence": chunk.sequence,
+                        "started_at_ns": chunk.started_at_ns,
+                        "duration_ns": chunk.duration_ns,
+                        "sample_rate": chunk.sample_rate,
+                        "channels": chunk.channels,
+                        "sample_format": chunk.sample_format,
+                        "frame_count": chunk.frame_count,
+                        "bytes": len(audio_bytes),
+                        "device_id": chunk.device_id,
+                        "device_name": chunk.device_name,
+                        "source_process_id": chunk.source_process_id,
+                        "source_process_name": chunk.source_process_name,
+                        "capture_packets_dropped": chunk.capture_packets_dropped,
+                    }, ensure_ascii=False) + "\n", encoding="utf-8")
+
+                    received_at_ns = time_ns()
+                    audio_age_ms = round(
+                        max(0, received_at_ns - chunk.started_at_ns) / 1_000_000,
+                        1,
+                    )
+                    update_bridge_status(
+                        status="CONNECTED",
+                        audio_status="RECEIVING",
+                        audio_stream_id=chunk.stream_id,
+                        audio_mode=(
+                            "process_loopback" if chunk.source_process_id is not None
+                            else app.state.bridge["audio_mode"]
+                        ),
+                        audio_device_id=chunk.device_id,
+                        audio_device_name=chunk.device_name,
+                        audio_source_process_id=chunk.source_process_id,
+                        audio_source_process_name=chunk.source_process_name,
+                        audio_sample_rate=chunk.sample_rate,
+                        audio_channels=chunk.channels,
+                        audio_sample_format=chunk.sample_format,
+                        audio_chunk_duration_ms=round(chunk.duration_ns / 1_000_000, 1),
+                        audio_chunks_received=app.state.bridge["audio_chunks_received"] + 1,
+                        audio_bytes_received=(
+                            app.state.bridge["audio_bytes_received"] + len(audio_bytes)
+                        ),
+                        audio_capture_packets_dropped=chunk.capture_packets_dropped,
+                        last_audio_chunk_id=chunk.chunk_id,
+                        last_audio_sequence=chunk.sequence,
+                        last_audio_started_at=datetime.fromtimestamp(
+                            chunk.started_at_ns / 1_000_000_000, UTC
+                        ).isoformat(),
+                        last_audio_age_ms=audio_age_ms,
+                        _last_audio_started_at_ns=chunk.started_at_ns,
+                        _audio_last_sequence=chunk.sequence,
+                        last_message_type=message_type,
+                        last_error=None,
+                    )
+                    record_bridge_event("bridge.audio_chunk.received", {
+                        "stream_id": chunk.stream_id,
+                        "chunk_id": chunk.chunk_id,
+                        "sequence": chunk.sequence,
+                        "bytes": len(audio_bytes),
+                        "sample_rate": chunk.sample_rate,
+                        "channels": chunk.channels,
+                        "sample_format": chunk.sample_format,
+                        "source_process_id": chunk.source_process_id,
+                        "capture_packets_dropped": chunk.capture_packets_dropped,
+                    })
+                    await websocket.send_json({
+                        "type": "audio_ack",
+                        "stream_id": chunk.stream_id,
+                        "chunk_id": chunk.chunk_id,
+                        "sequence": chunk.sequence,
+                        "accepted": True,
                     })
                 else:
                     code = "MESSAGE_TYPE_UNSUPPORTED"

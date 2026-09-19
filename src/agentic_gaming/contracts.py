@@ -73,6 +73,25 @@ class VisionState(StrictModel):
     annotated_frame_ref: str | None = None
 
 
+class AudioChunk(StrictModel):
+    type: str = "audio_chunk"
+    stream_id: str
+    chunk_id: str
+    sequence: int = Field(ge=1)
+    started_at_ns: int = Field(ge=0)
+    duration_ns: int = Field(gt=0)
+    sample_rate: int = Field(gt=0)
+    channels: int = Field(gt=0, le=32)
+    sample_format: str
+    frame_count: int = Field(gt=0)
+    data_base64: str
+    device_id: str | None = None
+    device_name: str | None = None
+    source_process_id: int | None = Field(default=None, gt=0)
+    source_process_name: str | None = None
+    capture_packets_dropped: int = Field(default=0, ge=0)
+
+
 class AudioEvent(StrictModel):
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     started_at_ns: int = Field(ge=0)
