@@ -77,6 +77,7 @@ try
         capture_interval_ms = options.CaptureIntervalMs,
         max_capture_width = options.MaxCaptureWidth,
         max_capture_height = options.MaxCaptureHeight,
+        core_connect_timeout_ms = options.CoreConnectTimeoutMs,
         audio_enabled = options.AudioEnabled,
         audio_mode = options.AudioMode,
         audio_device_id = options.AudioDeviceId,

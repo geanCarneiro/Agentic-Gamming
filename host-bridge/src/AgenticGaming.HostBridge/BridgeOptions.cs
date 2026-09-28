@@ -15,6 +15,7 @@ public sealed record BridgeOptions(
     bool SafeCapture,
     string LogPath,
     string PreviewPath,
+    int CoreConnectTimeoutMs,
     bool AudioEnabled,
     string AudioMode,
     string? AudioDeviceId,
@@ -27,7 +28,7 @@ public sealed record BridgeOptions(
     public static BridgeOptions FromEnvironment(string[] args)
     {
         var endpoint = Environment.GetEnvironmentVariable("AGENTIC_CORE_WS")
-            ?? "ws://localhost:8000/ws/host-bridge";
+            ?? "ws://127.0.0.1:8000/ws/host-bridge";
         var token = Environment.GetEnvironmentVariable("HOST_BRIDGE_TOKEN")
             ?? "dev-only-change-me";
         var interval = ReadPositiveInt("BRIDGE_CAPTURE_INTERVAL_MS", 500);
@@ -43,6 +44,7 @@ public sealed record BridgeOptions(
             ?? Path.Combine(repositoryRoot, "data", "logs", "host-bridge.jsonl");
         var previewPath = Environment.GetEnvironmentVariable("BRIDGE_PREVIEW_PATH")
             ?? Path.Combine(repositoryRoot, "data", "bridge", "preview.png");
+        var coreConnectTimeoutMs = ReadPositiveInt("BRIDGE_CORE_CONNECT_TIMEOUT_MS", 5000);
         var audioEnabled = ReadBoolean("BRIDGE_AUDIO_ENABLED", true) &&
             !args.Any(argument => argument.Equals("--no-audio", StringComparison.OrdinalIgnoreCase));
         var audioMode = ReadOption(args, "--audio-mode") ??
@@ -88,6 +90,7 @@ public sealed record BridgeOptions(
             safeCapture,
             logPath,
             previewPath,
+            coreConnectTimeoutMs,
             audioEnabled,
             audioMode.ToLowerInvariant(),
             audioDeviceId,

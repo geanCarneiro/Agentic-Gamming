@@ -31,16 +31,7 @@ public sealed class CoreWebSocketClient
         AudioCapture? audioCapture,
         CancellationToken cancellationToken)
     {
-        using var socket = new ClientWebSocket();
-        socket.Options.SetRequestHeader("X-Bridge-Token", _options.Token);
-
-        await _logger.WriteAsync("transport.connecting", new
-        {
-            endpoint = _options.CoreWebSocketEndpoint,
-            client_id = _clientId,
-        }, cancellationToken);
-        await socket.ConnectAsync(_options.CoreWebSocketEndpoint, cancellationToken);
-        await _logger.WriteAsync("transport.connected", new { client_id = _clientId }, cancellationToken);
+        using var socket = await ConnectToCoreAsync(cancellationToken);
 
         if (audioCapture is not null)
         {
@@ -49,7 +40,7 @@ public sealed class CoreWebSocketClient
 
         await SendAsync(socket, new BridgeHelloMessage(
             "hello",
-            "beta-3",
+            "beta-4",
             _clientId,
             BuildCapabilities(audioCapture is not null),
             _options.DryRun,
@@ -187,6 +178,86 @@ public sealed class CoreWebSocketClient
         }, cancellationToken);
     }
 
+    private async Task<ClientWebSocket> ConnectToCoreAsync(CancellationToken cancellationToken)
+    {
+        Exception? lastError = null;
+        foreach (var endpoint in GetCandidateEndpoints(_options.CoreWebSocketEndpoint))
+        {
+            var socket = new ClientWebSocket();
+            var connected = false;
+            socket.Options.SetRequestHeader("X-Bridge-Token", _options.Token);
+            await _logger.WriteAsync("transport.connecting", new
+            {
+                endpoint,
+                client_id = _clientId,
+                timeout_ms = _options.CoreConnectTimeoutMs,
+            }, cancellationToken);
+
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(_options.CoreConnectTimeoutMs);
+            try
+            {
+                await socket.ConnectAsync(endpoint, timeout.Token);
+                await _logger.WriteAsync("transport.connected", new
+                {
+                    endpoint,
+                    client_id = _clientId,
+                }, cancellationToken);
+                connected = true;
+                return socket;
+            }
+            catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                lastError = new TimeoutException(
+                    $"A conexão com o Core excedeu {_options.CoreConnectTimeoutMs} ms.",
+                    exception);
+                await _logger.WriteAsync("transport.connect_timeout", new
+                {
+                    endpoint,
+                    timeout_ms = _options.CoreConnectTimeoutMs,
+                }, cancellationToken);
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                lastError = exception;
+                await _logger.WriteAsync("transport.connect_failed", new
+                {
+                    endpoint,
+                    exception = exception.GetType().FullName,
+                    message = exception.Message,
+                }, cancellationToken);
+            }
+            finally
+            {
+                if (!connected)
+                {
+                    socket.Dispose();
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Não foi possível conectar ao Core por nenhum endpoint configurado.",
+            lastError);
+    }
+
+    private static IReadOnlyList<Uri> GetCandidateEndpoints(Uri endpoint)
+    {
+        var endpoints = new List<Uri> { endpoint };
+        if (endpoint.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            var ipv4Endpoint = new UriBuilder(endpoint)
+            {
+                Host = "127.0.0.1",
+            }.Uri;
+            endpoints.Add(ipv4Endpoint);
+        }
+
+        return endpoints
+            .DistinctBy(candidate => candidate.AbsoluteUri, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     private async Task PersistLatestAudioAsync(
         CapturedAudioChunk chunk,
         CancellationToken cancellationToken)
@@ -246,6 +317,18 @@ public sealed class CoreWebSocketClient
             while (!result.EndOfMessage);
 
             var text = Encoding.UTF8.GetString(message.ToArray());
+            using var document = JsonDocument.Parse(text);
+            if (document.RootElement.TryGetProperty("type", out var typeElement) &&
+                typeElement.GetString() == "vision_annotations")
+            {
+                var annotations = JsonSerializer.Deserialize<BridgeVisionAnnotationsMessage>(
+                    text,
+                    BridgeJson.Options);
+                if (annotations is not null && _overlay is not null)
+                {
+                    await _overlay.UpdateAnnotationsAsync(annotations, cancellationToken);
+                }
+            }
             await _logger.WriteAsync("transport.message_received", new { message = text }, cancellationToken);
         }
     }
@@ -253,8 +336,8 @@ public sealed class CoreWebSocketClient
     private static string[] BuildCapabilities(bool audioEnabled)
     {
         return audioEnabled
-            ? ["screen_capture", "preview_frame", "basic_overlay", "audio_pcm", "latest_audio_chunk"]
-            : ["screen_capture", "preview_frame", "basic_overlay"];
+            ? ["screen_capture", "preview_frame", "basic_overlay", "vision_overlay", "audio_pcm", "latest_audio_chunk"]
+            : ["screen_capture", "preview_frame", "basic_overlay", "vision_overlay"];
     }
 
     private async Task SendAsync(ClientWebSocket socket, object message, CancellationToken cancellationToken)

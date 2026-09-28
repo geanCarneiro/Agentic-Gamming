@@ -58,6 +58,8 @@ class VisionEntity(StrictModel):
     state: str | None = None
     confidence: float = Field(ge=0, le=1)
     bbox: tuple[float, float, float, float] | None = None
+    detector_id: str | None = None
+    evidence: list[str] = Field(default_factory=list)
     properties: dict[str, Any] = Field(default_factory=dict)
     origin: InformationOrigin = InformationOrigin.OBSERVED_NOW
 
@@ -65,12 +67,19 @@ class VisionEntity(StrictModel):
 class VisionState(StrictModel):
     frame_id: str = Field(default_factory=lambda: str(uuid4()))
     captured_at_ns: int = Field(ge=0)
+    frame_width: int = Field(default=0, ge=0)
+    frame_height: int = Field(default=0, ge=0)
     scene: str | None = None
     confidence: float = Field(ge=0, le=1)
     entities: list[VisionEntity] = Field(default_factory=list)
     changed: list[str] = Field(default_factory=list)
     raw_frame_ref: str | None = None
     annotated_frame_ref: str | None = None
+    detector_id: str | None = None
+    detector_status: str = "fallback"
+    processing_ms: float | None = Field(default=None, ge=0)
+    stage_timings_ms: dict[str, float] = Field(default_factory=dict)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
 class AudioChunk(StrictModel):
@@ -174,6 +183,7 @@ class WorldState(StrictModel):
     version: int = Field(ge=0)
     updated_at_ns: int = Field(ge=0)
     scene: str | None = None
+    latest_vision: VisionState | None = None
     facts: dict[str, ObservedFact] = Field(default_factory=dict)
     event_queue: list[AudioEvent] = Field(default_factory=list)
     active_action: ActiveAction | None = None

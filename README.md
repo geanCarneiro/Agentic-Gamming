@@ -15,9 +15,25 @@ Esta primeira implementação cobre a fundação da Alpha:
 - replay JSON Lines;
 - API FastAPI;
 - UI mínima para iniciar execução, injetar visão/áudio e observar o estado.
-- logs estruturados JSONL em `data/logs/core.jsonl`, também disponíveis pela API.
+- logs estruturados JSONL em `data/logs/core.jsonl`, também disponíveis pela API;
+- primeiro pipeline visual do Beta 4.1, configurado pelo Game Pack FNAF 1.
 
-O Game Pack FNAF 1 ainda é um contrato inicial. Ele não contém os detectores reais, calibração de tela ou a estratégia completa do jogo.
+O pipeline visual é executado pelo Game Pack, não pelo Core. O Bridge envia o
+`FramePacket` inteiro ao Core; o Core apenas carrega o entrypoint declarado no
+manifesto e chama `observe`. O FNAF 1 implementa seu runtime em
+`game-packs/fnaf1/vision/runtime.py` e usa `pack.fnaf1.difference_roi`: cada
+assinatura declara um ROI, um frame positivo, um frame negativo, threshold e
+entidades/bboxes. Para este pack, YOLO, matching alinhado e template matching
+estão desativados.
+
+O runtime do FNAF separa ROIs fixos da tela e ROIs do cenário. Para o cenário,
+o registro considera somente deslocamento horizontal da viewport antes de
+aplicar a diferença. O Core conhece apenas os contratos de frame e
+`VisionState`; ele não conhece OpenCV, assets, ROIs ou tipos de detector.
+
+As referências ficam em `game-packs/fnaf1/vision/pipeline.json` e continuam
+apontando para os assets originais em `data/games/FNAF1/assets`; nenhum asset foi
+copiado, renomeado ou removido.
 
 ## Executar com Docker
 
@@ -44,6 +60,18 @@ Com o core em execução, o Bridge pode ser iniciado pela raiz do projeto:
 ```
 
 O modo padrão é `dry-run`. O último frame recebido pelo core pode ser visualizado em `http://localhost:8000/api/bridge/latest-frame`, e os logs do Bridge ficam em `data/logs/host-bridge.jsonl`.
+
+No Beta 4.1, o Bridge recebe `vision_annotations` e desenha as caixas sobre o
+overlay usando a cor hexadecimal configurada por identidade no Game Pack. O Core
+mantém apenas o frame mais recente pendente para evitar atraso acumulado; a
+visão mais recente também fica disponível em
+`http://localhost:8000/api/bridge/latest-vision`.
+
+A compilação visual pode ser iniciada pelo endpoint
+`POST /api/game-packs/fnaf1/vision/compile`. Ela grava os inputs, o diff, a
+máscara, o positivo anotado e um índice HTML em `data/diagnostics/gamepack-compile`.
+Consulte [o guia da compilação visual](docs/beta4-compilacao-visual.md) para os
+detalhes dos artefatos e da configuração de cores.
 
 O dashboard em `http://localhost:8000` possui a seção Beta 2 `Visão ao vivo do agente`, que mostra a conexão do Bridge, o Game Profile, a janela/PID, o modo de captura, métricas do último frame e eventos recentes. A página também mantém o laboratório Alpha para simulações controladas.
 

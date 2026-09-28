@@ -41,6 +41,30 @@ public sealed record BridgeHeartbeatMessage(
     [property: JsonPropertyName("type")] string Type,
     [property: JsonPropertyName("sent_at_ns")] long SentAtNs);
 
+public sealed record BridgeVisionAnnotationsMessage(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("protocol_version")] string ProtocolVersion,
+    [property: JsonPropertyName("frame_id")] string FrameId,
+    [property: JsonPropertyName("captured_at_ns")] long CapturedAtNs,
+    [property: JsonPropertyName("width")] int Width,
+    [property: JsonPropertyName("height")] int Height,
+    [property: JsonPropertyName("scene")] string? Scene,
+    [property: JsonPropertyName("detector_status")] string DetectorStatus,
+    [property: JsonPropertyName("processing_ms")] double? ProcessingMs,
+    [property: JsonPropertyName("age_ms")] double AgeMs,
+    [property: JsonPropertyName("boxes")] VisionOverlayBox[] Boxes);
+
+public sealed record VisionOverlayBox(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("label")] string Label,
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("state")] string? State,
+    [property: JsonPropertyName("confidence")] double Confidence,
+    [property: JsonPropertyName("bbox")] double[]? Bbox,
+    [property: JsonPropertyName("bbox_color")] string? BboxColor,
+    [property: JsonPropertyName("origin")] string Origin,
+    [property: JsonPropertyName("evidence")] string[] Evidence);
+
 public sealed record BridgeAudioChunkMessage(
     [property: JsonPropertyName("type")] string Type,
     [property: JsonPropertyName("stream_id")] string StreamId,

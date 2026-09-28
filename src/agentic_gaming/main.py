@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import json
@@ -8,9 +9,10 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 from time import monotonic_ns, time_ns
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -33,6 +35,7 @@ from .event_bus import InMemoryEventBus, NatsEventBus
 from .gamepacks import GamePack, GamePackRegistry
 from .logging_setup import configure_logging, read_logs
 from .motor import MotorExecutor
+from .vision_host import GamePackVisionHost
 from .world_state import WorldStateStore
 
 logger = logging.getLogger("agentic_gaming.core")
@@ -119,6 +122,20 @@ def create_app() -> FastAPI:
             "last_frame_bytes": None,
             "last_frame_received_at": None,
             "last_frame_age_ms": None,
+            "vision_status": "DISABLED",
+            "last_vision_frame_id": None,
+            "vision_entities_detected": 0,
+            "vision_last_error": None,
+            "vision_detector_id": None,
+            "vision_detector_status": "DISABLED",
+            "vision_last_processing_ms": None,
+            "vision_last_queue_age_ms": None,
+            "vision_last_capture_to_core_ms": None,
+            "vision_last_queue_wait_ms": None,
+            "vision_last_observation_age_ms": None,
+            "vision_last_stage_timings_ms": {},
+            "vision_stage_latency_percentiles_ms": {},
+            "vision_frames_dropped": 0,
             "last_message_type": None,
             "last_error": None,
             "_last_frame_received_at_ns": None,
@@ -169,6 +186,10 @@ def create_app() -> FastAPI:
         }
         app.state.bridge_events = []
         app.state.audio_analyzer = None
+        app.state.vision = GamePackVisionHost()
+        app.state.latest_vision = None
+        app.state.latest_vision_frame_bytes = None
+        app.state.vision_latency_samples = {}
         logger.info("core_started", extra={"event_type": "core.started"})
 
     @app.on_event("shutdown")
@@ -193,6 +214,24 @@ def create_app() -> FastAPI:
 
     def update_bridge_status(**changes) -> None:
         app.state.bridge.update(changes)
+
+    def record_vision_latency_samples(stage_timings_ms: dict[str, float]) -> dict:
+        percentiles: dict[str, dict[str, float | int]] = {}
+        samples_by_stage: dict[str, list[float]] = app.state.vision_latency_samples
+        for stage, duration_ms in stage_timings_ms.items():
+            samples = samples_by_stage.setdefault(stage, [])
+            samples.append(float(duration_ms))
+            del samples[:-256]
+            ordered = sorted(samples)
+            last = len(ordered) - 1
+            percentiles[stage] = {
+                "samples": len(ordered),
+                "p50_ms": round(ordered[round(last * 0.50)], 2),
+                "p95_ms": round(ordered[round(last * 0.95)], 2),
+                "p99_ms": round(ordered[round(last * 0.99)], 2),
+                "max_ms": round(ordered[-1], 2),
+            }
+        return percentiles
 
     @app.get("/", include_in_schema=False)
     async def index():
@@ -237,6 +276,41 @@ def create_app() -> FastAPI:
             media_type="image/png",
             filename="latest.png",
             content_disposition_type="inline",
+        )
+
+    @app.get("/api/bridge/latest-vision")
+    async def latest_bridge_vision():
+        vision = app.state.latest_vision
+        if vision is not None:
+            return vision.model_dump()
+        vision_path = Path(os.getenv("BRIDGE_ARTIFACTS_DIR", "data/bridge")) / "latest-vision.json"
+        if not vision_path.exists():
+            raise HTTPException(status_code=404, detail="No bridge vision has been produced")
+        return json.loads(vision_path.read_text(encoding="utf-8"))
+
+    @app.get("/api/bridge/latest-vision-frame", include_in_schema=False)
+    async def latest_bridge_vision_frame(frame_id: str):
+        vision = app.state.latest_vision
+        frame_bytes = app.state.latest_vision_frame_bytes
+        if vision is not None and frame_bytes is not None:
+            current_frame_id = vision.frame_id
+        else:
+            bridge_dir = Path(os.getenv("BRIDGE_ARTIFACTS_DIR", "data/bridge"))
+            vision_path = bridge_dir / "latest-vision.json"
+            frame_path = bridge_dir / "latest-vision-frame.png"
+            if not vision_path.exists() or not frame_path.exists():
+                raise HTTPException(status_code=404, detail="No vision frame has been produced")
+            persisted_vision = json.loads(vision_path.read_text(encoding="utf-8"))
+            current_frame_id = persisted_vision.get("frame_id")
+            frame_bytes = frame_path.read_bytes()
+        if frame_bytes is None:
+            raise HTTPException(status_code=404, detail="No vision frame has been produced")
+        if frame_id != current_frame_id:
+            raise HTTPException(status_code=409, detail="The requested frame is no longer current")
+        return Response(
+            content=frame_bytes,
+            media_type="image/png",
+            headers={"X-Frame-ID": current_frame_id, "Cache-Control": "no-store"},
         )
 
     @app.get("/api/bridge/latest-audio", include_in_schema=False)
@@ -285,6 +359,17 @@ def create_app() -> FastAPI:
         await websocket.accept()
         bridge_dir = Path(os.getenv("BRIDGE_ARTIFACTS_DIR", "data/bridge"))
         bridge_dir.mkdir(parents=True, exist_ok=True)
+        pending_frame: dict | None = None
+        pending_frame_event = asyncio.Event()
+        pending_frame_lock = asyncio.Lock()
+        send_lock = asyncio.Lock()
+        next_frame_sequence = 0
+        latest_frame_sequence = 0
+
+        async def send_bridge_json(payload: dict) -> None:
+            async with send_lock:
+                await websocket.send_json(payload)
+
         connected_at = datetime.now(UTC).isoformat()
         update_bridge_status(
             status="CONNECTED",
@@ -295,6 +380,179 @@ def create_app() -> FastAPI:
         )
         record_bridge_event("bridge.connected", {})
         logger.info("host_bridge_connected", extra={"event_type": "bridge.connected"})
+
+        async def process_latest_frame(frame: dict) -> None:
+            processing_started_ns = time_ns()
+            captured_at_ns = int(frame["captured_at_ns"])
+            received_at_ns = int(frame["received_at_ns"])
+            frame_id = frame["frame_id"]
+            frame_bytes = frame["frame_bytes"]
+            frame_sequence = int(frame["vision_sequence"])
+            try:
+                profile_id = app.state.bridge.get("profile_id")
+                pack = app.state.registry.get(
+                    profile_id or os.getenv("DEFAULT_GAME_PACK", "fnaf1")
+                )
+                vision = await asyncio.to_thread(
+                    app.state.vision.observe,
+                    frame_id=frame_id,
+                    captured_at_ns=captured_at_ns,
+                    width=frame["width"],
+                    height=frame["height"],
+                    frame_bytes=frame_bytes,
+                    game_pack=pack,
+                )
+                gamepack_returned_ns = time_ns()
+                capture_to_core_ms = max(0, received_at_ns - captured_at_ns) / 1_000_000
+                queue_wait_ms = max(0, processing_started_ns - received_at_ns) / 1_000_000
+                vision.stage_timings_ms.update({
+                    "capture_to_core": capture_to_core_ms,
+                    "queue_wait": queue_wait_ms,
+                    "core_dispatch": max(
+                        0.0,
+                        max(0, gamepack_returned_ns - processing_started_ns) / 1_000_000
+                        - (vision.processing_ms or 0),
+                    ),
+                })
+                vision.raw_frame_ref = (
+                    "/api/bridge/latest-vision-frame?frame_id="
+                    + quote(frame_id, safe="")
+                )
+                boxes = [
+                    {
+                        "id": entity.id,
+                        "label": entity.properties.get("label", entity.kind),
+                        "kind": entity.kind,
+                        "bbox_color": entity.properties.get("bbox_color"),
+                        "state": entity.state,
+                        "confidence": entity.confidence,
+                        "bbox": list(entity.bbox) if entity.bbox is not None else None,
+                        "camera_id": entity.properties.get("camera_id"),
+                        "properties": entity.properties,
+                        "origin": entity.origin.value,
+                        "evidence": entity.evidence,
+                    }
+                    for entity in vision.entities
+                ]
+
+                async with pending_frame_lock:
+                    newer_frame_is_pending = (
+                        pending_frame is not None or frame_sequence != latest_frame_sequence
+                    )
+                    if newer_frame_is_pending:
+                        update_bridge_status(
+                            vision_frames_dropped=app.state.bridge["vision_frames_dropped"] + 1,
+                        )
+                        record_bridge_event("bridge.vision.stale_discarded", {
+                            "frame_id": frame_id,
+                            "reason": "newer_frame_received",
+                        })
+                        return
+
+                    vision.stage_timings_ms["observation_age_at_publish"] = (
+                        max(0, time_ns() - captured_at_ns) / 1_000_000
+                    )
+                    stage_percentiles = record_vision_latency_samples(
+                        vision.stage_timings_ms
+                    )
+                    vision_path = bridge_dir / "latest-vision.json"
+                    vision_frame_path = bridge_dir / "latest-vision-frame.png"
+                    vision_frame_path.write_bytes(frame_bytes)
+                    vision_path.write_text(
+                        json.dumps(vision.model_dump(), ensure_ascii=False) + "\n",
+                        encoding="utf-8",
+                    )
+                    app.state.latest_vision = vision
+                    app.state.latest_vision_frame_bytes = frame_bytes
+                    observation_age_ms = vision.stage_timings_ms["observation_age_at_publish"]
+                    update_bridge_status(
+                        vision_status=(
+                            "READY" if vision.detector_status == "ready" else "DEGRADED"
+                        ),
+                        last_vision_frame_id=vision.frame_id,
+                        vision_entities_detected=len(vision.entities),
+                        vision_last_error=None,
+                        vision_detector_id=vision.detector_id,
+                        vision_detector_status=vision.detector_status.upper(),
+                        vision_last_processing_ms=round(vision.processing_ms or 0, 1),
+                        vision_last_queue_age_ms=round(queue_wait_ms, 1),
+                        vision_last_capture_to_core_ms=round(capture_to_core_ms, 1),
+                        vision_last_queue_wait_ms=round(queue_wait_ms, 1),
+                        vision_last_observation_age_ms=round(observation_age_ms, 1),
+                        vision_last_stage_timings_ms=vision.stage_timings_ms,
+                        vision_stage_latency_percentiles_ms=stage_percentiles,
+                    )
+                    await send_bridge_json({
+                        "type": "vision_annotations",
+                        "protocol_version": "beta-4",
+                        "frame_id": vision.frame_id,
+                        "captured_at_ns": vision.captured_at_ns,
+                        "width": vision.frame_width,
+                        "height": vision.frame_height,
+                        "scene": vision.scene,
+                        "detector_status": vision.detector_status,
+                        "processing_ms": vision.processing_ms,
+                        "age_ms": observation_age_ms,
+                        "boxes": boxes,
+                    })
+                    run_id_value = app.state.bridge.get("run_id")
+                    if isinstance(run_id_value, str):
+                        try:
+                            run_session = app.state.runs.get(UUID(run_id_value))
+                        except ValueError:
+                            run_session = None
+                        if run_session is not None:
+                            state = run_session.state_store.ingest_vision(vision)
+                            await run_session.emit(
+                                "perception.vision.state",
+                                vision.model_dump(),
+                                vision.captured_at_ns,
+                            )
+                            logger.info(
+                                "bridge_vision_ingested",
+                                extra={
+                                    "run_id": run_session.info.run_id,
+                                    "event_type": "perception.vision.state",
+                                    "state_version": state.version,
+                                },
+                            )
+                record_bridge_event("bridge.vision.detected", {
+                    "frame_id": vision.frame_id,
+                    "entities": len(vision.entities),
+                    "boxes": boxes,
+                    "processing_ms": vision.processing_ms,
+                    "capture_to_core_ms": capture_to_core_ms,
+                    "queue_wait_ms": queue_wait_ms,
+                    "observation_age_ms": observation_age_ms,
+                    "stage_timings_ms": vision.stage_timings_ms,
+                })
+            except Exception as exc:
+                update_bridge_status(
+                    vision_status="ERROR",
+                    vision_last_error=str(exc),
+                )
+                logger.warning(
+                    "bridge_vision_failed",
+                    extra={
+                        "event_type": "bridge.vision.error",
+                        "frame_id": frame_id,
+                        "error_message": str(exc),
+                    },
+                )
+
+        async def vision_worker() -> None:
+            nonlocal pending_frame
+            while True:
+                await pending_frame_event.wait()
+                async with pending_frame_lock:
+                    frame = pending_frame
+                    pending_frame = None
+                    if pending_frame is None:
+                        pending_frame_event.clear()
+                if frame is not None:
+                    await process_latest_frame(frame)
+
+        vision_worker_task = asyncio.create_task(vision_worker())
         try:
             while True:
                 message = await websocket.receive_json()
@@ -367,9 +625,9 @@ def create_app() -> FastAPI:
                         "run_id": message.get("run_id"),
                         "audio": audio,
                     })
-                    await websocket.send_json({
+                    await send_bridge_json({
                         "type": "hello_ack",
-                        "protocol_version": "beta-3",
+                        "protocol_version": "beta-4",
                         "server": "agentic-gaming-core",
                         "accepted": True,
                     })
@@ -386,7 +644,7 @@ def create_app() -> FastAPI:
                             last_error="FRAME_DATA_MISSING",
                         )
                         record_bridge_event("bridge.error", {"code": "FRAME_DATA_MISSING"})
-                        await websocket.send_json({
+                        await send_bridge_json({
                             "type": "error",
                             "code": "FRAME_DATA_MISSING",
                             "message": "frame.data_base64 must be a string",
@@ -400,23 +658,21 @@ def create_app() -> FastAPI:
                             last_error="FRAME_DATA_INVALID",
                         )
                         record_bridge_event("bridge.error", {"code": "FRAME_DATA_INVALID"})
-                        await websocket.send_json({
+                        await send_bridge_json({
                             "type": "error",
                             "code": "FRAME_DATA_INVALID",
                             "message": "frame.data_base64 is not valid base64",
                         })
                         continue
+
+                    received_at_ns = time_ns()
+                    captured_at_ns = int(message.get("captured_at_ns") or received_at_ns)
                     frame_path = bridge_dir / "latest.png"
                     frame_path.write_bytes(frame_bytes)
-                    received_at_ns = time_ns()
-                    captured_at_ns = message.get("captured_at_ns")
-                    try:
-                        frame_age_ms = round(
-                            max(0, received_at_ns - int(captured_at_ns)) / 1_000_000,
-                            1,
-                        )
-                    except (TypeError, ValueError):
-                        frame_age_ms = None
+                    frame_age_ms = round(
+                        max(0, received_at_ns - captured_at_ns) / 1_000_000,
+                        1,
+                    )
                     source_process_id = message.get("source_process_id")
                     update_bridge_status(
                         status="CONNECTED",
@@ -450,20 +706,45 @@ def create_app() -> FastAPI:
                         "height": message.get("height"),
                         "window_title": message.get("source_window_title"),
                     })
-                    await websocket.send_json({
+                    async with pending_frame_lock:
+                        next_frame_sequence += 1
+                        latest_frame_sequence = next_frame_sequence
+                        frame_sequence = next_frame_sequence
+                        dropped_pending = pending_frame is not None
+                        pending_frame = {
+                            "frame_id": frame_id,
+                            "vision_sequence": frame_sequence,
+                            "captured_at_ns": captured_at_ns,
+                            "received_at_ns": received_at_ns,
+                            "width": int(message.get("width") or 0),
+                            "height": int(message.get("height") or 0),
+                            "frame_bytes": frame_bytes,
+                        }
+                        pending_frame_event.set()
+                    if dropped_pending:
+                        update_bridge_status(
+                            vision_frames_dropped=app.state.bridge["vision_frames_dropped"] + 1,
+                        )
+                        record_bridge_event("bridge.vision.frame_dropped", {
+                            "frame_id": frame_id,
+                            "reason": "newer_frame_replaced_pending",
+                        })
+                    await send_bridge_json({
                         "type": "frame_ack",
                         "frame_id": frame_id,
                         "stored_path": str(frame_path),
                         "bytes": len(frame_bytes),
+                        "accepted": True,
                     })
                     logger.info("host_bridge_frame", extra={
                         "event_type": "bridge.frame.received",
                         "frame_id": frame_id,
                         "bytes": len(frame_bytes),
+                        "queued": True,
                     })
                 elif message_type == "heartbeat":
                     update_bridge_status(last_message_type="heartbeat")
-                    await websocket.send_json({
+                    await send_bridge_json({
                         "type": "heartbeat_ack",
                         "received_at_ns": monotonic_ns(),
                     })
@@ -477,7 +758,7 @@ def create_app() -> FastAPI:
                             "code": code,
                             "details": exc.errors(include_url=False),
                         })
-                        await websocket.send_json({
+                        await send_bridge_json({
                             "type": "error",
                             "code": code,
                             "message": "audio_chunk does not satisfy the Beta 3 contract",
@@ -495,7 +776,7 @@ def create_app() -> FastAPI:
                             "code": code,
                             "sample_format": chunk.sample_format,
                         })
-                        await websocket.send_json({
+                        await send_bridge_json({
                             "type": "error",
                             "code": code,
                             "message": "Unsupported audio sample format",
@@ -508,7 +789,7 @@ def create_app() -> FastAPI:
                         code = "AUDIO_DATA_INVALID"
                         update_bridge_status(last_message_type=message_type, last_error=code)
                         record_bridge_event("bridge.error", {"code": code})
-                        await websocket.send_json({
+                        await send_bridge_json({
                             "type": "error",
                             "code": code,
                             "message": "audio_chunk.data_base64 is not valid base64",
@@ -524,7 +805,7 @@ def create_app() -> FastAPI:
                             "expected_bytes": expected_bytes,
                             "actual_bytes": len(audio_bytes),
                         })
-                        await websocket.send_json({
+                        await send_bridge_json({
                             "type": "error",
                             "code": code,
                             "message": "audio chunk byte length does not match its format",
@@ -545,7 +826,7 @@ def create_app() -> FastAPI:
                             "sequence": chunk.sequence,
                             "previous_sequence": previous_sequence,
                         })
-                        await websocket.send_json({
+                        await send_bridge_json({
                             "type": "error",
                             "code": code,
                             "message": "audio chunk sequence must increase per stream",
@@ -587,7 +868,7 @@ def create_app() -> FastAPI:
                             "message": str(exc),
                             "chunk_id": chunk.chunk_id,
                         })
-                        await websocket.send_json({
+                        await send_bridge_json({
                             "type": "error",
                             "code": code,
                             "message": "audio chunk could not be analyzed",
@@ -704,7 +985,7 @@ def create_app() -> FastAPI:
                         "capture_packets_dropped": chunk.capture_packets_dropped,
                         "analysis": analysis_payload,
                     })
-                    await websocket.send_json({
+                    await send_bridge_json({
                         "type": "audio_ack",
                         "stream_id": chunk.stream_id,
                         "chunk_id": chunk.chunk_id,
@@ -718,7 +999,7 @@ def create_app() -> FastAPI:
                         "code": code,
                         "message_type": message_type,
                     })
-                    await websocket.send_json({
+                    await send_bridge_json({
                         "type": "error",
                         "code": "MESSAGE_TYPE_UNSUPPORTED",
                         "message": f"Unsupported bridge message type: {message_type}",
@@ -732,10 +1013,38 @@ def create_app() -> FastAPI:
             )
             record_bridge_event("bridge.disconnected", {})
             logger.info("host_bridge_disconnected", extra={"event_type": "bridge.disconnected"})
+        finally:
+            vision_worker_task.cancel()
+            try:
+                await vision_worker_task
+            except asyncio.CancelledError:
+                pass
 
     @app.get("/api/game-packs")
     async def game_packs():
         return app.state.registry.summaries()
+
+    @app.post("/api/game-packs/{pack_id}/vision/compile")
+    async def compile_game_pack_vision(pack_id: str):
+        try:
+            game_pack = app.state.registry.get(pack_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        output_dir = Path(os.getenv("GAME_PACK_COMPILE_DIR", "data/diagnostics/gamepack-compile"))
+        try:
+            return await asyncio.to_thread(
+                app.state.vision.compile,
+                game_pack=game_pack,
+                output_dir=output_dir,
+            )
+        except NotImplementedError as exc:
+            raise HTTPException(status_code=501, detail=str(exc)) from exc
+        except (OSError, ValueError, RuntimeError) as exc:
+            logger.exception(
+                "game_pack_vision_compile_failed",
+                extra={"event_type": "gamepack.vision.compile.failed", "game_pack_id": pack_id},
+            )
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     @app.post("/api/runs", response_model=RunInfo)
     async def create_run(request: CreateRunRequest):

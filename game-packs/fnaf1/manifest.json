@@ -10,9 +10,10 @@
     "audio_events": ["unknown", "footstep", "door_movement", "ambient"]
   },
   "vision": {
-    "pipeline": [],
-    "status": "contract_only",
-    "notes": "Detectors and calibration are intentionally external and not implemented yet."
+    "pipeline_file": "vision/pipeline.json",
+    "entrypoint": "vision/runtime.py:DifferenceVision",
+    "status": "beta_4_difference_roi_camera_title",
+    "notes": "The pack uses positive/negative difference signatures constrained by normalized ROIs and identifies configured camera views from the in-game title. A recognized camera limits evaluation to its own candidates. User-provided in-game screenshots are calibration references; the smoke evaluation is in-sample. YOLO, aligned candidate matching and general template matching remain disabled."
   },
   "audio": {
     "pipeline": [],

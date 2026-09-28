@@ -1,0 +1,66 @@
+{
+  "purpose": "Integration smoke evaluation for user-provided in-game captures. Several images are also active positive calibration references, so entity results are in-sample.",
+  "samples": [
+    {
+      "image": "data/games/FNAF1/ingame-eval/01_cam2b_w_hall_corner.png",
+      "camera_id": "CAM2B",
+      "expected_labels": [
+        "Bonnie"
+      ]
+    },
+    {
+      "image": "data/games/FNAF1/ingame-eval/02_cam1a_show_stage.png",
+      "camera_id": "CAM1A",
+      "expected_labels": [
+        "Bonnie",
+        "Chica",
+        "Freddy"
+      ]
+    },
+    {
+      "image": "data/games/FNAF1/ingame-eval/03_cam7_restrooms.png",
+      "camera_id": "CAM7",
+      "expected_labels": [
+        "Chica"
+      ]
+    },
+    {
+      "image": "data/games/FNAF1/ingame-eval/04_cam1c_pirate_cove.png",
+      "camera_id": "CAM1C",
+      "expected_labels": [
+        "Foxy"
+      ]
+    },
+    {
+      "image": "data/games/FNAF1/ingame-eval/05_office_bonnie_door.png",
+      "camera_id": null,
+      "expected_labels": [
+        "Bonnie at doorway"
+      ]
+    },
+    {
+      "image": "data/games/FNAF1/ingame-eval/06_office_bonnie_shadow.png",
+      "camera_id": null,
+      "expected_labels": [
+        "bonnie_shadow"
+      ],
+      "forbidden_labels": [
+        "Bonnie at doorway"
+      ]
+    },
+    {
+      "image": "data/games/FNAF1/ingame-eval/07_cam7_restrooms_duplicate.png",
+      "camera_id": "CAM7",
+      "expected_labels": [
+        "Chica"
+      ]
+    },
+    {
+      "image": "data/games/FNAF1/ingame-eval/08_cam4b_e_hall_corner.png",
+      "camera_id": "CAM4B",
+      "expected_labels": [
+        "Chica"
+      ]
+    }
+  ]
+}

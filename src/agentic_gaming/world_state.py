@@ -14,6 +14,7 @@ class WorldStateStore:
         return self._state.model_copy(deep=True)
 
     def ingest_vision(self, vision: VisionState) -> WorldState:
+        self._state.latest_vision = vision.model_copy(deep=True)
         changed = []
         if vision.scene is not None:
             self._state.scene = vision.scene

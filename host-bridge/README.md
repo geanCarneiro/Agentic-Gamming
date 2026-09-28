@@ -35,7 +35,8 @@ O Bridge usa estas configurações:
 
 | Variável | Padrão | Finalidade |
 | --- | --- | --- |
-| `AGENTIC_CORE_WS` | `ws://localhost:8000/ws/host-bridge` | endpoint WebSocket do core |
+| `AGENTIC_CORE_WS` | `ws://127.0.0.1:8000/ws/host-bridge` | endpoint WebSocket do core; `localhost` faz fallback para IPv4 |
+| `BRIDGE_CORE_CONNECT_TIMEOUT_MS` | `5000` | timeout de cada tentativa de conexão com o Core |
 | `HOST_BRIDGE_TOKEN` | `dev-only-change-me` | token local de autenticação |
 | `BRIDGE_CAPTURE_INTERVAL_MS` | `500` | intervalo entre frames |
 | `BRIDGE_MAX_CAPTURE_WIDTH` | `1280` | largura máxima do frame enviado |

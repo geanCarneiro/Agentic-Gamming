@@ -58,6 +58,14 @@ public sealed class OverlayHost
         await InvokeAsync(window, () => window.Update(frame), cancellationToken);
     }
 
+    public async Task UpdateAnnotationsAsync(
+        BridgeVisionAnnotationsMessage annotations,
+        CancellationToken cancellationToken)
+    {
+        var window = await _ready.Task.WaitAsync(cancellationToken);
+        await InvokeAsync(window, () => window.UpdateAnnotations(annotations), cancellationToken);
+    }
+
     public async Task StopAsync()
     {
         if (!_ready.Task.IsCompletedSuccessfully)

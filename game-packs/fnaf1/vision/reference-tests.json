@@ -1,0 +1,379 @@
+{
+  "source": "curated FNAF1 asset references",
+  "cases": [
+    {
+      "asset": "90.png",
+      "candidate_id": "cam1b_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1B"
+    },
+    {
+      "asset": "120.png",
+      "candidate_id": "cam1b_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1B"
+    },
+    {
+      "asset": "215.png",
+      "candidate_id": "cam1b_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1B"
+    },
+    {
+      "asset": "222.png",
+      "candidate_id": "cam1b_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1B"
+    },
+    {
+      "asset": "211.png",
+      "candidate_id": "cam1c_foxy",
+      "identity": "foxy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1C"
+    },
+    {
+      "asset": "338.png",
+      "candidate_id": "cam1c_foxy",
+      "identity": "foxy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1C"
+    },
+    {
+      "asset": "553.png",
+      "candidate_id": "cam1c_foxy_attack_imminent",
+      "identity": "foxy_attack_imminent",
+      "state": "imminent",
+      "kind": "event",
+      "camera_id": "CAM1C"
+    },
+    {
+      "asset": "206.png",
+      "candidate_id": "cam2a_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM2A"
+    },
+    {
+      "asset": "241.png",
+      "candidate_id": "cam2a_foxy_running",
+      "identity": "foxy",
+      "state": "running",
+      "kind": "character",
+      "camera_id": "CAM2A"
+    },
+    {
+      "asset": "244.png",
+      "candidate_id": "cam2a_foxy_running",
+      "identity": "foxy",
+      "state": "running",
+      "kind": "character",
+      "camera_id": "CAM2A"
+    },
+    {
+      "asset": "245.png",
+      "candidate_id": "cam2a_foxy_running",
+      "identity": "foxy",
+      "state": "running",
+      "kind": "character",
+      "camera_id": "CAM2A"
+    },
+    {
+      "asset": "246.png",
+      "candidate_id": "cam2a_foxy_running",
+      "identity": "foxy",
+      "state": "running",
+      "kind": "character",
+      "camera_id": "CAM2A"
+    },
+    {
+      "asset": "247.png",
+      "candidate_id": "cam2a_foxy_running",
+      "identity": "foxy",
+      "state": "running",
+      "kind": "character",
+      "camera_id": "CAM2A"
+    },
+    {
+      "asset": "248.png",
+      "candidate_id": "cam2a_foxy_running",
+      "identity": "foxy",
+      "state": "running",
+      "kind": "character",
+      "camera_id": "CAM2A"
+    },
+    {
+      "asset": "188.png",
+      "candidate_id": "cam2b_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM2B"
+    },
+    {
+      "asset": "190.png",
+      "candidate_id": "cam3_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM3"
+    },
+    {
+      "asset": "221.png",
+      "candidate_id": "cam4a_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM4A"
+    },
+    {
+      "asset": "226.png",
+      "candidate_id": "cam4a_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM4A"
+    },
+    {
+      "asset": "487.png",
+      "candidate_id": "cam4a_freddy",
+      "identity": "freddy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM4A"
+    },
+    {
+      "asset": "220.png",
+      "candidate_id": "cam4b_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM4B"
+    },
+    {
+      "asset": "451.png",
+      "candidate_id": "cam4b_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM4B"
+    },
+    {
+      "asset": "476.png",
+      "candidate_id": "cam4b_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM4B"
+    },
+    {
+      "asset": "486.png",
+      "candidate_id": "cam4b_freddy",
+      "identity": "freddy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM4B"
+    },
+    {
+      "asset": "205.png",
+      "candidate_id": "cam5_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM5"
+    },
+    {
+      "asset": "555.png",
+      "candidate_id": "cam5_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM5"
+    },
+    {
+      "asset": "217.png",
+      "candidate_id": "cam7_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM7"
+    },
+    {
+      "asset": "219.png",
+      "candidate_id": "cam7_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM7"
+    },
+    {
+      "asset": "494.png",
+      "candidate_id": "cam7_freddy",
+      "identity": "freddy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM7"
+    },
+    {
+      "asset": "242.png",
+      "candidate_id": "foxy_jumpscare",
+      "identity": "foxy_jumpscare",
+      "state": "jumpscare",
+      "kind": "event",
+      "camera_id": null
+    },
+    {
+      "asset": "291.png",
+      "candidate_id": "bonnie_jumpscare",
+      "identity": "bonnie_jumpscare",
+      "state": "jumpscare",
+      "kind": "event",
+      "camera_id": null
+    },
+    {
+      "asset": "228.png",
+      "candidate_id": "chica_jumpscare",
+      "identity": "chica_jumpscare",
+      "state": "jumpscare",
+      "kind": "event",
+      "camera_id": null
+    },
+    {
+      "asset": "495.png",
+      "candidate_id": "freddy_jumpscare",
+      "identity": "freddy_jumpscare",
+      "state": "jumpscare",
+      "kind": "event",
+      "camera_id": null
+    },
+    {
+      "asset": "358.png",
+      "candidate_id": "game_over_screen",
+      "identity": "game_over",
+      "state": "game_over",
+      "kind": "event",
+      "camera_id": null
+    },
+    {
+      "asset": "19.png",
+      "candidate_id": "cam1a_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    },
+    {
+      "asset": "223.png",
+      "candidate_id": "cam1a_bonnie",
+      "identity": "bonnie",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    },
+    {
+      "asset": "19.png",
+      "candidate_id": "cam1a_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    },
+    {
+      "asset": "68.png",
+      "candidate_id": "cam1a_chica",
+      "identity": "chica",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    },
+    {
+      "asset": "19.png",
+      "candidate_id": "cam1a_freddy",
+      "identity": "freddy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    },
+    {
+      "asset": "68.png",
+      "candidate_id": "cam1a_freddy",
+      "identity": "freddy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    },
+    {
+      "asset": "223.png",
+      "candidate_id": "cam1a_freddy",
+      "identity": "freddy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    },
+    {
+      "asset": "224.png",
+      "candidate_id": "cam1a_freddy",
+      "identity": "freddy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    },
+    {
+      "asset": "355.png",
+      "candidate_id": "cam1a_freddy",
+      "identity": "freddy",
+      "state": "present",
+      "kind": "character",
+      "camera_id": "CAM1A"
+    }
+  ],
+  "negative_cases": [
+    {
+      "asset": "44.png",
+      "candidate_id": "cam2a_foxy_running"
+    },
+    {
+      "asset": "49.png",
+      "candidate_id": "cam4b_chica"
+    },
+    {
+      "asset": "66.png",
+      "candidate_id": "cam1c_foxy_attack_imminent"
+    },
+    {
+      "asset": "39.png",
+      "candidate_id": "foxy_jumpscare"
+    },
+    {
+      "asset": "39.png",
+      "candidate_id": "game_over_screen"
+    },
+    {
+      "asset": "553.png",
+      "candidate_id": "cam1c_foxy"
+    },
+    {
+      "asset": "484.png",
+      "candidate_id": "cam1a_bonnie"
+    },
+    {
+      "asset": "484.png",
+      "candidate_id": "cam1a_chica"
+    },
+    {
+      "asset": "484.png",
+      "candidate_id": "cam1a_freddy"
+    }
+  ]
+}

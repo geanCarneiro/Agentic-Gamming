@@ -1,0 +1,1126 @@
+{
+  "asset_root": "../../data/games/FNAF1/assets",
+  "rois": [
+    {
+      "id": "office_chica_world",
+      "bbox": [
+        0.58,
+        0.1,
+        0.32,
+        0.88
+      ],
+      "coordinate_space": "world",
+      "purpose": "difference_search"
+    },
+    {
+      "id": "office_bonnie_world",
+      "bbox": [
+        0.08,
+        0.12,
+        0.44,
+        0.78
+      ],
+      "coordinate_space": "world",
+      "purpose": "difference_search"
+    },
+    {
+      "id": "cam1b_freddy_dim",
+      "bbox": [
+        0.44,
+        0.08,
+        0.12,
+        0.25
+      ],
+      "coordinate_space": "screen",
+      "purpose": "difference_search"
+    },
+    {
+      "id": "office_bonnie_window",
+      "bbox": [
+        0.2,
+        0.3,
+        0.18,
+        0.43
+      ],
+      "coordinate_space": "world",
+      "purpose": "difference_search"
+    },
+    {
+      "id": "left_control_panel",
+      "bbox": [
+        0.015,
+        0.4,
+        0.065,
+        0.36
+      ],
+      "side": "left",
+      "purpose": "difference_search"
+    },
+    {
+      "id": "right_control_panel",
+      "bbox": [
+        0.92,
+        0.4,
+        0.065,
+        0.36
+      ],
+      "side": "right",
+      "purpose": "difference_search"
+    },
+    {
+      "id": "reference_frame",
+      "bbox": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "coordinate_space": "screen",
+      "purpose": "curated_reference_compare"
+    },
+    {
+      "id": "office_bonnie_doorway_face",
+      "bbox": [
+        0.08,
+        0.07,
+        0.18,
+        0.42
+      ],
+      "coordinate_space": "screen",
+      "purpose": "difference_search"
+    }
+  ],
+  "camera_title_detection": {
+    "enabled": true,
+    "roi": [
+      0.62,
+      0.395,
+      0.28,
+      0.06
+    ],
+    "threshold": 200,
+    "minimum_score": 0.6,
+    "minimum_margin": 0.12,
+    "templates": [
+      {
+        "camera_id": "CAM1A",
+        "asset": "camera_titles/CAM1A.png"
+      },
+      {
+        "camera_id": "CAM1C",
+        "asset": "camera_titles/CAM1C.png"
+      },
+      {
+        "camera_id": "CAM2B",
+        "asset": "camera_titles/CAM2B.png"
+      },
+      {
+        "camera_id": "CAM4B",
+        "asset": "camera_titles/CAM4B.png"
+      },
+      {
+        "camera_id": "CAM7",
+        "asset": "camera_titles/CAM7.png"
+      }
+    ]
+  },
+  "viewport_registration": {
+    "enabled": true,
+    "reference_asset": "39.png",
+    "reference_size": [
+      1600,
+      720
+    ],
+    "anchor_roi": [
+      0.38,
+      0.08,
+      0.24,
+      0.18
+    ],
+    "search_range": [
+      0.0,
+      1.0
+    ],
+    "coarse_step": 0.02,
+    "refine_step": 0.004,
+    "min_confidence": 0.65,
+    "max_anchor_error": 14.0,
+    "min_anchor_std": 3.0,
+    "max_pan_jump_px": 120
+  },
+  "difference_detection": {
+    "id": "pack.fnaf1.difference_roi",
+    "enabled": true,
+    "candidates": [
+      {
+        "id": "office_chica_right_door",
+        "positive_asset": "227.png",
+        "negative_asset": "127.png",
+        "roi_id": "office_chica_world",
+        "coordinate_space": "world",
+        "scene": "office",
+        "threshold": 0.58,
+        "pixel_threshold": 18,
+        "open_kernel": 3,
+        "close_kernel": 5,
+        "dilate_kernel": 5,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "chica",
+            "label": "chica",
+            "kind": "character",
+            "identity": "chica",
+            "bbox": [
+              0.64,
+              0.14,
+              0.2,
+              0.82
+            ],
+            "bbox_scope": "reference",
+            "bbox_mode": "detected"
+          }
+        ]
+      },
+      {
+        "id": "office_bonnie_shadow",
+        "positive_asset": "225.png",
+        "negative_asset": "58.png",
+        "roi_id": "office_bonnie_window",
+        "coordinate_space": "world",
+        "scene": "office",
+        "threshold": 0.54,
+        "min_score_margin": 0.1,
+        "pixel_threshold": 8,
+        "open_kernel": 3,
+        "close_kernel": 5,
+        "dilate_kernel": 3,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie_shadow",
+            "label": "bonnie_shadow",
+            "kind": "evidence",
+            "identity": "bonnie_shadow",
+            "bbox_mode": "detected"
+          }
+        ],
+        "negative_assets": [
+          "58.png",
+          "127.png"
+        ]
+      },
+      {
+        "id": "office_bonnie_door_ingame",
+        "positive_asset": "ingame/office_bonnie_door_ingame.png",
+        "negative_asset": "ingame/office_no_bonnie_door_ingame.png",
+        "roi_id": "office_bonnie_doorway_face",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "office",
+        "threshold": 0.54,
+        "min_score_margin": 0.08,
+        "pixel_threshold": 8,
+        "blur_kernel": 5,
+        "open_kernel": 3,
+        "close_kernel": 5,
+        "dilate_kernel": 3,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie_doorway",
+            "label": "Bonnie at doorway",
+            "kind": "character",
+            "identity": "bonnie",
+            "state": "present",
+            "bbox": [
+              0.09,
+              0.08,
+              0.16,
+              0.36
+            ],
+            "bbox_scope": "frame",
+            "bbox_mode": "hint"
+          }
+        ],
+        "negative_assets": [
+          "ingame/office_no_bonnie_door_ingame.png",
+          "127.png"
+        ]
+      },
+      {
+        "id": "left_door_active",
+        "positive_asset": "124.png",
+        "negative_asset": "122.png",
+        "roi_id": "left_control_panel",
+        "reference_scope": "roi",
+        "scene": "office",
+        "threshold": 0.58,
+        "pixel_threshold": 15,
+        "blur_kernel": 3,
+        "open_kernel": 1,
+        "close_kernel": 3,
+        "dilate_kernel": 3,
+        "min_component_area": 8,
+        "entities": [
+          {
+            "id": "door",
+            "label": "left door",
+            "kind": "interaction",
+            "bbox": [
+              0.1,
+              0.05,
+              0.8,
+              0.42
+            ],
+            "bbox_scope": "roi",
+            "bbox_mode": "hint"
+          }
+        ]
+      },
+      {
+        "id": "left_light_active",
+        "positive_asset": "125.png",
+        "negative_asset": "122.png",
+        "roi_id": "left_control_panel",
+        "reference_scope": "roi",
+        "scene": "office",
+        "threshold": 0.58,
+        "pixel_threshold": 15,
+        "blur_kernel": 3,
+        "open_kernel": 1,
+        "close_kernel": 3,
+        "dilate_kernel": 3,
+        "min_component_area": 8,
+        "entities": [
+          {
+            "id": "light",
+            "label": "left light",
+            "kind": "interaction",
+            "bbox": [
+              0.1,
+              0.48,
+              0.8,
+              0.4
+            ],
+            "bbox_scope": "roi",
+            "bbox_mode": "hint"
+          }
+        ]
+      },
+      {
+        "id": "right_door_active",
+        "positive_asset": "135.png",
+        "negative_asset": "134.png",
+        "roi_id": "right_control_panel",
+        "reference_scope": "roi",
+        "scene": "office",
+        "threshold": 0.58,
+        "pixel_threshold": 15,
+        "blur_kernel": 3,
+        "open_kernel": 1,
+        "close_kernel": 3,
+        "dilate_kernel": 3,
+        "min_component_area": 8,
+        "entities": [
+          {
+            "id": "door",
+            "label": "right door",
+            "kind": "interaction",
+            "bbox": [
+              0.1,
+              0.05,
+              0.8,
+              0.42
+            ],
+            "bbox_scope": "roi",
+            "bbox_mode": "hint"
+          }
+        ]
+      },
+      {
+        "id": "right_light_active",
+        "positive_asset": "131.png",
+        "negative_asset": "134.png",
+        "roi_id": "right_control_panel",
+        "reference_scope": "roi",
+        "scene": "office",
+        "threshold": 0.58,
+        "pixel_threshold": 15,
+        "blur_kernel": 3,
+        "open_kernel": 1,
+        "close_kernel": 3,
+        "dilate_kernel": 3,
+        "min_component_area": 8,
+        "entities": [
+          {
+            "id": "light",
+            "label": "right light",
+            "kind": "interaction",
+            "bbox": [
+              0.1,
+              0.48,
+              0.8,
+              0.4
+            ],
+            "bbox_scope": "roi",
+            "bbox_mode": "hint"
+          }
+        ]
+      },
+      {
+        "id": "cam1a_bonnie",
+        "positive_asset": "19.png",
+        "positive_assets": [
+          "19.png",
+          "223.png",
+          "ingame/cam1a_show_stage_ingame.png"
+        ],
+        "negative_asset": "484.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM1A",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie",
+            "label": "Bonnie",
+            "kind": "character",
+            "identity": "bonnie",
+            "state": "present"
+          }
+        ],
+        "positive_asset_bboxes": {
+          "ingame/cam1a_show_stage_ingame.png": [
+            0.02,
+            0.02,
+            0.34,
+            0.93
+          ]
+        }
+      },
+      {
+        "id": "cam1a_chica",
+        "positive_asset": "19.png",
+        "positive_assets": [
+          "19.png",
+          "68.png",
+          "ingame/cam1a_show_stage_ingame.png"
+        ],
+        "negative_asset": "484.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM1A",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "chica",
+            "label": "Chica",
+            "kind": "character",
+            "identity": "chica",
+            "state": "present"
+          }
+        ],
+        "positive_asset_bboxes": {
+          "ingame/cam1a_show_stage_ingame.png": [
+            0.35,
+            0.02,
+            0.32,
+            0.93
+          ]
+        }
+      },
+      {
+        "id": "cam1a_freddy",
+        "positive_asset": "19.png",
+        "positive_assets": [
+          "19.png",
+          "68.png",
+          "223.png",
+          "224.png",
+          "355.png",
+          "ingame/cam1a_show_stage_ingame.png"
+        ],
+        "negative_asset": "484.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM1A",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "freddy",
+            "label": "Freddy",
+            "kind": "character",
+            "identity": "freddy",
+            "state": "present"
+          }
+        ],
+        "positive_asset_bboxes": {
+          "ingame/cam1a_show_stage_ingame.png": [
+            0.67,
+            0.02,
+            0.31,
+            0.93
+          ]
+        }
+      },
+      {
+        "id": "cam1b_bonnie",
+        "positive_asset": "90.png",
+        "positive_assets": [
+          "90.png",
+          "120.png"
+        ],
+        "negative_asset": "48.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM1B",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie",
+            "label": "Bonnie",
+            "kind": "character",
+            "identity": "bonnie",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "cam1b_chica",
+        "positive_asset": "215.png",
+        "positive_assets": [
+          "215.png",
+          "222.png"
+        ],
+        "negative_asset": "48.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM1B",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "chica",
+            "label": "Chica",
+            "kind": "character",
+            "identity": "chica",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "cam1b_freddy_492",
+        "positive_asset": "492.png",
+        "negative_asset": "48.png",
+        "roi_id": "cam1b_freddy_dim",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM1B",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 4,
+        "blur_kernel": 5,
+        "open_kernel": 3,
+        "close_kernel": 5,
+        "dilate_kernel": 3,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "freddy",
+            "label": "Freddy",
+            "kind": "character",
+            "identity": "freddy",
+            "state": "present",
+            "bbox_mode": "detected"
+          }
+        ]
+      },
+      {
+        "id": "cam1c_foxy",
+        "positive_asset": "211.png",
+        "positive_assets": [
+          "211.png",
+          "338.png",
+          "ingame/cam1c_foxy_ingame.png"
+        ],
+        "negative_asset": "553.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM1C",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "foxy",
+            "label": "Foxy",
+            "kind": "character",
+            "identity": "foxy",
+            "state": "present"
+          }
+        ],
+        "positive_asset_bboxes": {
+          "ingame/cam1c_foxy_ingame.png": [
+            0.46,
+            0.12,
+            0.18,
+            0.52
+          ]
+        }
+      },
+      {
+        "id": "cam1c_foxy_attack_imminent",
+        "positive_asset": "553.png",
+        "positive_assets": [
+          "553.png"
+        ],
+        "negative_asset": "66.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM1C",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "foxy_attack_imminent",
+            "label": "Foxy attack imminent",
+            "kind": "event",
+            "identity": "foxy_attack_imminent",
+            "state": "imminent"
+          }
+        ]
+      },
+      {
+        "id": "cam2a_bonnie",
+        "positive_asset": "206.png",
+        "positive_assets": [
+          "206.png"
+        ],
+        "negative_asset": "44.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM2A",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie",
+            "label": "Bonnie",
+            "kind": "character",
+            "identity": "bonnie",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "cam2a_foxy_running",
+        "positive_asset": "241.png",
+        "positive_assets": [
+          "241.png",
+          "244.png",
+          "245.png",
+          "246.png",
+          "247.png",
+          "248.png"
+        ],
+        "negative_asset": "44.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM2A",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "foxy",
+            "label": "Foxy",
+            "kind": "character",
+            "identity": "foxy",
+            "state": "running"
+          }
+        ]
+      },
+      {
+        "id": "cam2b_bonnie",
+        "positive_asset": "188.png",
+        "positive_assets": [
+          "188.png",
+          "ingame/cam2b_bonnie_ingame.png"
+        ],
+        "negative_asset": "0.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM2B",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie",
+            "label": "Bonnie",
+            "kind": "character",
+            "identity": "bonnie",
+            "state": "present"
+          }
+        ],
+        "positive_asset_bboxes": {
+          "ingame/cam2b_bonnie_ingame.png": [
+            0.08,
+            0.08,
+            0.47,
+            0.84
+          ]
+        }
+      },
+      {
+        "id": "cam3_bonnie",
+        "positive_asset": "190.png",
+        "positive_assets": [
+          "190.png"
+        ],
+        "negative_asset": "62.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM3",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie",
+            "label": "Bonnie",
+            "kind": "character",
+            "identity": "bonnie",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "cam4a_chica",
+        "positive_asset": "221.png",
+        "positive_assets": [
+          "221.png",
+          "226.png"
+        ],
+        "negative_asset": "67.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM4A",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "chica",
+            "label": "Chica",
+            "kind": "character",
+            "identity": "chica",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "cam4a_freddy",
+        "positive_asset": "487.png",
+        "positive_assets": [
+          "487.png"
+        ],
+        "negative_asset": "67.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM4A",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "freddy",
+            "label": "Freddy",
+            "kind": "character",
+            "identity": "freddy",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "cam4b_chica",
+        "positive_asset": "220.png",
+        "positive_assets": [
+          "220.png",
+          "451.png",
+          "476.png",
+          "ingame/cam4b_chica_ingame.png"
+        ],
+        "negative_asset": "49.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM4B",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "chica",
+            "label": "Chica",
+            "kind": "character",
+            "identity": "chica",
+            "state": "present"
+          }
+        ],
+        "positive_asset_bboxes": {
+          "ingame/cam4b_chica_ingame.png": [
+            0.44,
+            0.12,
+            0.39,
+            0.66
+          ]
+        }
+      },
+      {
+        "id": "cam4b_freddy",
+        "positive_asset": "486.png",
+        "positive_assets": [
+          "486.png"
+        ],
+        "negative_asset": "49.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM4B",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "freddy",
+            "label": "Freddy",
+            "kind": "character",
+            "identity": "freddy",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "cam5_bonnie",
+        "positive_asset": "205.png",
+        "positive_assets": [
+          "205.png",
+          "555.png"
+        ],
+        "negative_asset": "83.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM5",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie",
+            "label": "Bonnie",
+            "kind": "character",
+            "identity": "bonnie",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "cam7_chica",
+        "positive_asset": "217.png",
+        "positive_assets": [
+          "217.png",
+          "219.png",
+          "ingame/cam7_chica_ingame.png"
+        ],
+        "negative_asset": "41.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM7",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "chica",
+            "label": "Chica",
+            "kind": "character",
+            "identity": "chica",
+            "state": "present"
+          }
+        ],
+        "positive_asset_bboxes": {
+          "ingame/cam7_chica_ingame.png": [
+            0.28,
+            0.03,
+            0.4,
+            0.79
+          ]
+        }
+      },
+      {
+        "id": "cam7_freddy",
+        "positive_asset": "494.png",
+        "positive_assets": [
+          "494.png"
+        ],
+        "negative_asset": "41.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "camera",
+        "camera_id": "CAM7",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "freddy",
+            "label": "Freddy",
+            "kind": "character",
+            "identity": "freddy",
+            "state": "present"
+          }
+        ]
+      },
+      {
+        "id": "foxy_jumpscare",
+        "positive_asset": "242.png",
+        "positive_assets": [
+          "242.png"
+        ],
+        "negative_asset": "39.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "jumpscare",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "foxy_jumpscare",
+            "label": "Foxy jumpscare",
+            "kind": "event",
+            "identity": "foxy_jumpscare",
+            "state": "jumpscare"
+          }
+        ]
+      },
+      {
+        "id": "bonnie_jumpscare",
+        "positive_asset": "291.png",
+        "positive_assets": [
+          "291.png"
+        ],
+        "negative_asset": "39.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "jumpscare",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "bonnie_jumpscare",
+            "label": "Bonnie jumpscare",
+            "kind": "event",
+            "identity": "bonnie_jumpscare",
+            "state": "jumpscare"
+          }
+        ]
+      },
+      {
+        "id": "chica_jumpscare",
+        "positive_asset": "228.png",
+        "positive_assets": [
+          "228.png"
+        ],
+        "negative_asset": "39.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "jumpscare",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "chica_jumpscare",
+            "label": "Chica jumpscare",
+            "kind": "event",
+            "identity": "chica_jumpscare",
+            "state": "jumpscare"
+          }
+        ]
+      },
+      {
+        "id": "freddy_jumpscare",
+        "positive_asset": "495.png",
+        "positive_assets": [
+          "495.png"
+        ],
+        "negative_asset": "39.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "jumpscare",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "freddy_jumpscare",
+            "label": "Freddy jumpscare",
+            "kind": "event",
+            "identity": "freddy_jumpscare",
+            "state": "jumpscare"
+          }
+        ]
+      },
+      {
+        "id": "game_over_screen",
+        "positive_asset": "358.png",
+        "positive_assets": [
+          "358.png"
+        ],
+        "negative_asset": "39.png",
+        "roi_id": "reference_frame",
+        "coordinate_space": "screen",
+        "reference_scope": "frame",
+        "scene": "game_over",
+        "threshold": 0.62,
+        "min_score_margin": 0.05,
+        "pixel_threshold": 18,
+        "min_component_area": 40,
+        "entities": [
+          {
+            "id": "game_over",
+            "label": "Game over",
+            "kind": "event",
+            "identity": "game_over",
+            "state": "game_over"
+          }
+        ]
+      }
+    ]
+  },
+  "references": [],
+  "aligned_matching": null,
+  "interaction_templates": [],
+  "specialized_detector": null,
+  "emit_static_regions": false,
+  "deferred_interactions": [
+    {
+      "id": "new_game_button",
+      "label": "new game",
+      "status": "pending_asset_mapping",
+      "notes": "Reservado para a tela inicial; não detectar nesta etapa."
+    },
+    {
+      "id": "continue_button",
+      "label": "continue",
+      "status": "pending_asset_mapping",
+      "notes": "Reservado para menus; não detectar nesta etapa."
+    }
+  ],
+  "interaction_regions": [],
+  "reference_assets": [
+    {
+      "asset": "540.png",
+      "role": "context_only",
+      "purpose": "Golden Freddy poster; negative context, not an active appearance"
+    },
+    {
+      "asset": "573.png",
+      "role": "reference_only",
+      "purpose": "isolated Golden Freddy sprite; no complete in-office frame to validate a detector"
+    },
+    {
+      "asset": "492.png",
+      "role": "active_positive",
+      "purpose": "Freddy in CAM1B; low-threshold positive-minus-negative signature against asset 48; bbox comes from connected difference components"
+    },
+    {
+      "asset": "127.png",
+      "role": "negative_validation",
+      "purpose": "empty office frame used to reject an overbroad Bonnie doorway/window-shadow signature"
+    }
+  ],
+  "bbox_colors": {
+    "foxy": "#E53935",
+    "chica": "#FBC02D",
+    "freddy": "#8D6E63",
+    "bonnie": "#7E57C2",
+    "bonnie_shadow": "#9575CD",
+    "game_over": "#FFFFFF"
+  }
+}
